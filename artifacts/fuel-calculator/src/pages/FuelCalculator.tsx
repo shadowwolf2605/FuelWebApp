@@ -423,9 +423,9 @@ function HistoryRow({ record, onDelete }: { record: FuelRecord; onDelete: () => 
           <StatItem icon={<Droplets size={12} />} colorClass="text-cyan-500"
             value={record.liters.toFixed(1)} unit="л" />
           <StatItem icon={<Banknote size={12} />} colorClass="text-green-500"
-            value={record.pricePerLiter.toFixed(2)} unit="лв/л" />
+            value={record.pricePerLiter.toFixed(2)} unit="€/л" />
           <StatItem icon={<CreditCard size={12} />} colorClass="text-orange-500"
-            value={totalCost(record).toFixed(2)} unit="лв" />
+            value={totalCost(record).toFixed(2)} unit="€" />
         </div>
       </Card>
     </motion.div>
@@ -616,7 +616,7 @@ export default function FuelCalculator() {
                 <FuelInputField
                   label="Цена за литър"
                   placeholder="напр. 2.89"
-                  unit="лв"
+                  unit="€"
                   icon={<Banknote size={18} />}
                   iconColorClass="text-green-500"
                   value={priceText}
@@ -645,7 +645,7 @@ export default function FuelCalculator() {
                   iconColorClass="text-green-500"
                   title="Обща сума"
                   value={cost !== null ? cost.toFixed(2) : "—"}
-                  unit="лв"
+                  unit="€"
                 />
               </div>
 
