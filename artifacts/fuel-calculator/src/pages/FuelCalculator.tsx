@@ -24,6 +24,12 @@ import {
   Timer,
   ChevronRight,
   X,
+  Route,
+  Users,
+  Loader2,
+  Search,
+  Split,
+  Pencil,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -580,12 +586,293 @@ function EmptyHistory() {
   );
 }
 
+// ─── Geocoding / Routing helpers ─────────────────────────────────────────────
+
+interface GeoResult { lat: number; lon: number; label: string; }
+
+async function geocodeAddress(q: string): Promise<GeoResult | null> {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`;
+  try {
+    const r = await fetch(url, { headers: { "Accept-Language": "bg,en" } });
+    const data = await r.json();
+    if (!data[0]) return null;
+    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), label: data[0].display_name.split(",")[0] };
+  } catch { return null; }
+}
+
+async function routeDistance(a: GeoResult, b: GeoResult): Promise<number> {
+  const url = `https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`;
+  const r = await fetch(url);
+  const data = await r.json();
+  if (data.code !== "Ok" || !data.routes?.[0]) throw new Error("Маршрутът не беше намерен");
+  return data.routes[0].distance / 1000;
+}
+
+// ─── Smart Trip Planner ───────────────────────────────────────────────────────
+
+type PlannerMode = "manual" | "auto";
+
+function SmartTripPlanner({ avgConsumption }: { avgConsumption: number | null }) {
+  const [mode, setMode] = useState<PlannerMode>("manual");
+
+  // Manual
+  const [manualKmText, setManualKmText] = useState("");
+
+  // Auto
+  const [fromText, setFromText] = useState("");
+  const [toText, setToText] = useState("");
+  const [routeKm, setRouteKm] = useState<number | null>(null);
+  const [routeLabels, setRouteLabels] = useState<{ from: string; to: string } | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+
+  // Shared
+  const [priceText, setPriceText] = useState("");
+  const [customConsText, setCustomConsText] = useState("");
+  const [passengers, setPassengers] = useState(1);
+
+  const distanceKm = mode === "manual" ? parseNum(manualKmText) : routeKm;
+  const effectiveCons = avgConsumption !== null ? avgConsumption : parseNum(customConsText);
+  const price = parseNum(priceText);
+  const totalLiters = distanceKm && effectiveCons && distanceKm > 0 && effectiveCons > 0
+    ? (distanceKm * effectiveCons) / 100 : null;
+  const totalCost = totalLiters && price && price > 0 ? totalLiters * price : null;
+  const perPerson = totalCost ? totalCost / passengers : null;
+
+  async function calcRoute() {
+    if (!fromText.trim() || !toText.trim()) return;
+    setRouteLoading(true); setRouteError(null); setRouteKm(null); setRouteLabels(null);
+    try {
+      const [a, b] = await Promise.all([geocodeAddress(fromText), geocodeAddress(toText)]);
+      if (!a) throw new Error(`Не намерих "${fromText}"`);
+      if (!b) throw new Error(`Не намерих "${toText}"`);
+      const km = await routeDistance(a, b);
+      setRouteKm(Math.round(km * 10) / 10);
+      setRouteLabels({ from: a.label, to: b.label });
+    } catch (e) { setRouteError((e as Error).message); }
+    finally { setRouteLoading(false); }
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/6">
+        <div className="w-8 h-8 rounded-xl bg-purple-500 flex items-center justify-center">
+          <Route size={15} className="text-white" />
+        </div>
+        <div>
+          <p className="text-[15px] font-semibold text-gray-900 dark:text-white leading-tight">Умен планировчик</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">Изчисли горивото за маршрут</p>
+        </div>
+      </div>
+
+      {/* Mode toggle */}
+      <div className="px-4 pt-3">
+        <div className="flex bg-gray-100 dark:bg-white/8 rounded-xl p-1 gap-1">
+          {(["manual", "auto"] as PlannerMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => { setMode(m); setRouteKm(null); setRouteError(null); setRouteLabels(null); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[10px] text-[13px] font-semibold transition-all duration-200 ${
+                mode === m
+                  ? "bg-white dark:bg-[#2c2c2e] text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-400 dark:text-gray-500"
+              }`}
+            >
+              {m === "manual" ? <><Pencil size={12} />Ръчно</> : <><Search size={12} />Авто</>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Mode content */}
+      <div className="px-4 pt-3 pb-0 space-y-3">
+        <AnimatePresence mode="wait">
+          {mode === "manual" ? (
+            <motion.div key="manual" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 8 }}>
+              <Field label="Разстояние" placeholder="напр. 350" unit="км"
+                icon={<Route size={17} />} iconColorClass="text-purple-500"
+                value={manualKmText} onChange={setManualKmText} />
+            </motion.div>
+          ) : (
+            <motion.div key="auto" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
+              <Field label="Начална точка" placeholder="напр. София" type="text"
+                icon={<Flag size={17} />} iconColorClass="text-green-500"
+                value={fromText} onChange={(v) => { setFromText(v); setRouteKm(null); setRouteLabels(null); }} />
+              <div className="h-px bg-gray-100 dark:bg-white/6" />
+              <Field label="Дестинация" placeholder="напр. Варна" type="text"
+                icon={<MapPin size={17} />} iconColorClass="text-red-500"
+                value={toText} onChange={(v) => { setToText(v); setRouteKm(null); setRouteLabels(null); }} />
+
+              <motion.button
+                onClick={calcRoute}
+                disabled={routeLoading || !fromText.trim() || !toText.trim()}
+                whileTap={!routeLoading ? { scale: 0.97 } : {}}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 ${
+                  routeLoading || !fromText.trim() || !toText.trim()
+                    ? "bg-gray-100 dark:bg-white/6 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                    : "bg-purple-500 text-white"
+                }`}
+              >
+                {routeLoading ? <><Loader2 size={14} className="animate-spin" />Изчислявам маршрут…</> : <><Search size={14} />Изчисли маршрут</>}
+              </motion.button>
+
+              <AnimatePresence>
+                {routeError && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center gap-1.5 text-orange-500 bg-orange-500/10 rounded-lg px-3 py-2 text-[12px]">
+                    <AlertTriangle size={12} />{routeError}
+                  </motion.div>
+                )}
+                {routeKm !== null && routeLabels && (
+                  <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                    className="bg-purple-500/8 dark:bg-purple-500/15 border border-purple-500/20 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Flag size={11} className="text-green-500 flex-shrink-0" />
+                      <span className="text-[12px] font-medium text-gray-900 dark:text-white truncate">{routeLabels.from}</span>
+                      <ArrowRight size={11} className="text-gray-400 flex-shrink-0" />
+                      <MapPin size={11} className="text-red-500 flex-shrink-0" />
+                      <span className="text-[12px] font-medium text-gray-900 dark:text-white truncate">{routeLabels.to}</span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-[22px] font-bold text-purple-500 tabular-nums">{routeKm.toFixed(1)}</span>
+                      <span className="text-[13px] text-gray-400">км по пътя</span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="h-px bg-gray-100 dark:bg-white/6" />
+
+        {/* Consumption */}
+        {avgConsumption !== null ? (
+          <div className="flex items-center gap-3 py-1">
+            <div className="w-7 flex-shrink-0 flex items-center justify-center text-orange-500">
+              <Gauge size={17} />
+            </div>
+            <div className="flex-1">
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-0.5">Среден разход (от история)</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-[15px] font-bold text-orange-500 tabular-nums">{avgConsumption.toFixed(2)}</span>
+                <span className="text-[12px] text-gray-400">л/100км</span>
+              </div>
+            </div>
+            <span className="text-[10px] text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full font-semibold">авто</span>
+          </div>
+        ) : (
+          <Field label="Среден разход" placeholder="напр. 7.5" unit="л/100км"
+            icon={<Gauge size={17} />} iconColorClass="text-orange-500"
+            value={customConsText} onChange={setCustomConsText} />
+        )}
+
+        <div className="h-px bg-gray-100 dark:bg-white/6" />
+
+        {/* Price */}
+        <Field label="Цена за литър" placeholder="напр. 1.79" unit="€"
+          icon={<Banknote size={17} />} iconColorClass="text-green-500"
+          value={priceText} onChange={setPriceText} />
+
+        <div className="h-px bg-gray-100 dark:bg-white/6" />
+
+        {/* Passengers slider */}
+        <div className="flex items-center gap-3">
+          <div className="w-7 flex-shrink-0 flex items-center justify-center text-blue-500">
+            <Users size={17} />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">Пътници (разделяне на разходите)</p>
+              <span className="text-[13px] font-bold text-blue-500 tabular-nums">{passengers}</span>
+            </div>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setPassengers(n)}
+                  className={`flex-1 h-8 rounded-lg text-[12px] font-bold transition-all duration-150 ${
+                    passengers === n
+                      ? "bg-blue-500 text-white shadow-sm shadow-blue-500/30"
+                      : "bg-gray-100 dark:bg-white/8 text-gray-400 dark:text-gray-500"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Results */}
+      <AnimatePresence>
+        {totalLiters !== null && totalCost !== null && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden">
+            <div className="mx-4 mb-4 mt-3 rounded-2xl overflow-hidden border border-purple-500/15 bg-gradient-to-br from-purple-500/6 to-blue-500/6 dark:from-purple-500/12 dark:to-blue-500/12">
+              <div className="px-3 py-2 border-b border-purple-500/10">
+                <p className="text-[11px] font-semibold text-purple-500 uppercase tracking-wide">Резултат</p>
+              </div>
+              <div className="p-3 flex gap-2">
+                <div className="flex-1 text-center">
+                  <Droplets size={14} className="text-cyan-500 mx-auto mb-1" />
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-0.5">Гориво</p>
+                  <p className="text-[18px] font-bold text-gray-900 dark:text-white tabular-nums">{totalLiters.toFixed(1)}<span className="text-[10px] font-normal text-gray-400 ml-0.5">л</span></p>
+                </div>
+                <div className="w-px bg-purple-500/15" />
+                <div className="flex-1 text-center">
+                  <CreditCard size={14} className="text-green-500 mx-auto mb-1" />
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-0.5">Общо</p>
+                  <p className="text-[18px] font-bold text-green-500 tabular-nums">{totalCost.toFixed(2)}<span className="text-[10px] font-normal text-gray-400 ml-0.5">€</span></p>
+                </div>
+                {passengers > 1 && (
+                  <>
+                    <div className="w-px bg-purple-500/15" />
+                    <div className="flex-1 text-center">
+                      <Split size={14} className="text-blue-500 mx-auto mb-1" />
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-0.5">На човек</p>
+                      <p className="text-[18px] font-bold text-blue-500 tabular-nums">{perPerson!.toFixed(2)}<span className="text-[10px] font-normal text-gray-400 ml-0.5">€</span></p>
+                    </div>
+                  </>
+                )}
+              </div>
+              {distanceKm && effectiveCons && (
+                <div className="px-3 pb-2.5 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+                  <Route size={10} />
+                  {distanceKm.toFixed(1)} км · {effectiveCons.toFixed(2)} л/100км · {price?.toFixed(2)} €/л
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Placeholder when no result yet */}
+      {(totalLiters === null || totalCost === null) && (
+        <div className="mx-4 mb-4 mt-3 rounded-2xl border border-dashed border-gray-200 dark:border-white/10 py-5 flex flex-col items-center gap-1.5">
+          <Route size={22} className="text-gray-200 dark:text-gray-700" />
+          <p className="text-[12px] text-gray-300 dark:text-gray-600 text-center px-4">
+            Въведи разстояние, разход и цена за резултат
+          </p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function FuelCalculator() {
   const [dark, setDark] = useState(false);
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
   const [history, setHistory] = useState<CompletedTrip[]>([]);
+
+  const avgConsumption = history.length > 0
+    ? history.reduce((sum, t) => sum + tripConsumption(t), 0) / history.length
+    : null;
 
   function startTrip(trip: ActiveTrip) {
     setActiveTrip(trip);
@@ -677,6 +964,9 @@ export default function FuelCalculator() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Smart Trip Planner */}
+            <SmartTripPlanner avgConsumption={avgConsumption} />
 
             {/* History section */}
             <div>
