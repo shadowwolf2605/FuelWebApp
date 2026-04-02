@@ -16,6 +16,17 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Artifacts
+
+### `artifacts/fuel-calculator` (`@workspace/fuel-calculator`)
+
+React + Vite mobile-style web app styled as an iPhone application. Bulgarian-language fuel consumption calculator converted from SwiftUI (ContentView.swift). Features:
+- Input card (km, liters, price per liter)
+- Live result calculation (consumption in л/100км and total cost in лв)
+- History with animated entries, tap-to-reveal delete
+- Dark mode toggle (sun/moon, matching iOS behavior)
+- Full iPhone shell UI with status bar, notch, home indicator
+
 ## Structure
 
 ```text

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Fuel Calculator"
+version = "1.0.0"
+id = "artifacts/fuel-calculator"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18514
+
+[services.development]
+run = "pnpm --filter @workspace/fuel-calculator run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fuel-calculator", "run", "build" ]
+publicDir = "artifacts/fuel-calculator/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18514"
+BASE_PATH = "/"

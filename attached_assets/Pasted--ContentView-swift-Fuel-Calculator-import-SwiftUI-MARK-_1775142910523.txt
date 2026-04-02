@@ -1,0 +1,453 @@
+// ContentView.swift
+// Fuel Calculator - разход на гориво
+
+import SwiftUI
+
+// MARK: - Model
+
+struct FuelRecord: Identifiable {
+    let id = UUID()
+    let date: Date
+    let kilometers: Double
+    let liters: Double
+    let pricePerLiter: Double
+    
+    var consumption: Double { (liters / kilometers) * 100 }
+    var totalCost: Double { liters * pricePerLiter }
+    
+    var dateFormatted: String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        f.locale = Locale(identifier: "bg_BG")
+        return f.string(from: date)
+    }
+}
+
+// MARK: - ViewModel
+
+class FuelViewModel: ObservableObject {
+    @Published var kilometersText = ""
+    @Published var litersText = ""
+    @Published var priceText = ""
+    @Published var history: [FuelRecord] = []
+    
+    var kilometers: Double? { Double(kilometersText.replacingOccurrences(of: ",", with: ".")) }
+    var liters: Double?    { Double(litersText.replacingOccurrences(of: ",", with: ".")) }
+    var price: Double?     { Double(priceText.replacingOccurrences(of: ",", with: ".")) }
+    
+    var consumption: Double? {
+        guard let km = kilometers, let lt = liters, km > 0, lt > 0 else { return nil }
+        return (lt / km) * 100
+    }
+    
+    var totalCost: Double? {
+        guard let lt = liters, let p = price, lt > 0, p > 0 else { return nil }
+        return lt * p
+    }
+    
+    var isValid: Bool {
+        consumption != nil && totalCost != nil
+    }
+    
+    func save() {
+        guard let km = kilometers, let lt = liters, let p = price, isValid else { return }
+        let record = FuelRecord(date: Date(), kilometers: km, liters: lt, pricePerLiter: p)
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            history.insert(record, at: 0)
+        }
+        kilometersText = ""
+        litersText = ""
+        priceText = ""
+    }
+    
+    func delete(at offsets: IndexSet) {
+        withAnimation { history.remove(atOffsets: offsets) }
+    }
+}
+
+// MARK: - Main View
+
+struct ContentView: View {
+    @StateObject private var vm = FuelViewModel()
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    InputCard(vm: vm)
+                    ResultCard(vm: vm)
+                    HistorySection(vm: vm)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 32)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Разход на гориво")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Image(systemName: colorScheme == .dark ? "moon.fill" : "sun.max.fill")
+                        .foregroundStyle(colorScheme == .dark ? .indigo : .orange)
+                        .font(.title3)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Input Card
+
+struct InputCard: View {
+    @ObservedObject var vm: FuelViewModel
+    @FocusState private var focusedField: Field?
+    
+    enum Field { case km, liters, price }
+    
+    var body: some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 18) {
+                Label("Въведи данни", systemImage: "fuelpump.fill")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                
+                FuelInputField(
+                    label: "Изминати километри",
+                    placeholder: "напр. 450",
+                    unit: "км",
+                    icon: "road.lanes",
+                    iconColor: .blue,
+                    text: $vm.kilometersText,
+                    focused: $focusedField,
+                    field: .km
+                )
+                
+                Divider()
+                
+                FuelInputField(
+                    label: "Заредени литри",
+                    placeholder: "напр. 40.5",
+                    unit: "л",
+                    icon: "drop.fill",
+                    iconColor: .cyan,
+                    text: $vm.litersText,
+                    focused: $focusedField,
+                    field: .liters
+                )
+                
+                Divider()
+                
+                FuelInputField(
+                    label: "Цена за литър",
+                    placeholder: "напр. 2.89",
+                    unit: "лв",
+                    icon: "banknote.fill",
+                    iconColor: .green,
+                    text: $vm.priceText,
+                    focused: $focusedField,
+                    field: .price
+                )
+            }
+        }
+        .onTapGesture { focusedField = nil }
+    }
+}
+
+// MARK: - Input Field Component
+
+struct FuelInputField: View {
+    let label: String
+    let placeholder: String
+    let unit: String
+    let icon: String
+    let iconColor: Color
+    @Binding var text: String
+    var focused: FocusState<InputCard.Field?>.Binding
+    let field: InputCard.Field
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(iconColor)
+                .frame(width: 28)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                HStack {
+                    TextField(placeholder, text: $text)
+                        .keyboardType(.decimalPad)
+                        .focused(focused, equals: field)
+                        .font(.body.weight(.medium))
+                    
+                    Text(unit)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(.tertiarySystemFill))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Result Card
+
+struct ResultCard: View {
+    @ObservedObject var vm: FuelViewModel
+    
+    var body: some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Резултат", systemImage: "chart.bar.fill")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                
+                HStack(spacing: 12) {
+                    ResultTile(
+                        icon: "gauge.with.needle.fill",
+                        iconColor: .orange,
+                        title: "Разход",
+                        value: vm.consumption.map { String(format: "%.2f", $0) } ?? "—",
+                        unit: "л/100км"
+                    )
+                    
+                    ResultTile(
+                        icon: "creditcard.fill",
+                        iconColor: .green,
+                        title: "Обща сума",
+                        value: vm.totalCost.map { String(format: "%.2f", $0) } ?? "—",
+                        unit: "лв"
+                    )
+                }
+                
+                Button(action: vm.save) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.down.fill")
+                        Text("Запази")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(vm.isValid ? Color.accentColor : Color(.systemFill))
+                    .foregroundStyle(vm.isValid ? .white : Color(.tertiaryLabel))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .animation(.easeInOut(duration: 0.2), value: vm.isValid)
+                }
+                .disabled(!vm.isValid)
+            }
+        }
+    }
+}
+
+// MARK: - Result Tile
+
+struct ResultTile: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let value: String
+    let unit: String
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(iconColor)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(alignment: .lastTextBaseline, spacing: 3) {
+                    Text(value)
+                        .font(.title3.weight(.bold))
+                        .contentTransition(.numericText())
+                    Text(unit)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// MARK: - History Section
+
+struct HistorySection: View {
+    @ObservedObject var vm: FuelViewModel
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("История", systemImage: "clock.fill")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if !vm.history.isEmpty {
+                    Text("\(vm.history.count) записа")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 4)
+            
+            if vm.history.isEmpty {
+                EmptyHistoryView()
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(vm.history) { record in
+                        HistoryRow(record: record)
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .top).combined(with: .opacity),
+                                removal: .move(edge: .trailing).combined(with: .opacity)
+                            ))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - History Row
+
+struct HistoryRow: View {
+    let record: FuelRecord
+    
+    var consumptionColor: Color {
+        switch record.consumption {
+        case ..<6:  return .green
+        case 6..<9: return .orange
+        default:    return .red
+        }
+    }
+    
+    var body: some View {
+        CardContainer {
+            VStack(spacing: 10) {
+                HStack {
+                    Image(systemName: "calendar")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                    Text(record.dateFormatted)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    ConsumptionBadge(value: record.consumption, color: consumptionColor)
+                }
+                
+                Divider()
+                
+                HStack(spacing: 0) {
+                    StatItem(icon: "road.lanes", color: .blue,
+                             value: String(format: "%.0f", record.kilometers), unit: "км")
+                    Spacer()
+                    StatItem(icon: "drop.fill", color: .cyan,
+                             value: String(format: "%.1f", record.liters), unit: "л")
+                    Spacer()
+                    StatItem(icon: "banknote.fill", color: .green,
+                             value: String(format: "%.2f", record.pricePerLiter), unit: "лв/л")
+                    Spacer()
+                    StatItem(icon: "creditcard.fill", color: .orange,
+                             value: String(format: "%.2f", record.totalCost), unit: "лв")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Small Helpers
+
+struct ConsumptionBadge: View {
+    let value: Double
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "gauge.with.needle.fill")
+                .font(.caption2)
+            Text(String(format: "%.2f л/100км", value))
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.15))
+        .clipShape(Capsule())
+    }
+}
+
+struct StatItem: View {
+    let icon: String
+    let color: Color
+    let value: String
+    let unit: String
+    
+    var body: some View {
+        VStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(color)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+            Text(unit)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+struct EmptyHistoryView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "tray.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(Color(.tertiaryLabel))
+            Text("Няма запазени записи")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text("Въведи данни и натисни „Запази"")
+                .font(.caption)
+                .foregroundStyle(Color(.tertiaryLabel))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+// MARK: - Card Container
+
+struct CardContainer<Content: View>: View {
+    @ViewBuilder let content: Content
+    
+    var body: some View {
+        content
+            .padding(16)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
+    ContentView()
+}
+
+#Preview("Dark Mode") {
+    ContentView()
+        .preferredColorScheme(.dark)
+}
