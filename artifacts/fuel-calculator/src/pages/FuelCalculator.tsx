@@ -25,36 +25,6 @@ const TAB_TITLES: Record<Tab, string> = {
   expenses: "Разходи & Анализ",
 };
 
-// ─── Status Bar ───────────────────────────────────────────────────────────────
-
-function StatusBar() {
-  const now = new Date();
-  return (
-    <div className="flex items-center justify-between px-6 pt-4 pb-1 flex-shrink-0">
-      <span className="text-[13px] font-semibold text-gray-900 dark:text-white">
-        {now.getHours()}:{String(now.getMinutes()).padStart(2, "0")}
-      </span>
-      <div className="w-24 h-6 bg-black dark:bg-[#1c1c1e] rounded-full mx-auto" />
-      <div className="flex items-center gap-1.5">
-        <div className="flex gap-0.5 items-end">
-          {[2, 3, 4, 5].map((h) => (
-            <div key={h} className="w-1 bg-gray-900 dark:bg-white rounded-[1px]" style={{ height: h * 2 + "px" }} />
-          ))}
-        </div>
-        <svg width="15" height="12" viewBox="0 0 15 12" className="fill-gray-900 dark:fill-white">
-          <path d="M7.5 2.1C9.56 2.1 11.4 2.93 12.74 4.28L14.14 2.88C12.43 1.1 10.09 0 7.5 0C4.91 0 2.57 1.1 0.86 2.88L2.26 4.28C3.6 2.93 5.44 2.1 7.5 2.1Z" />
-          <path d="M7.5 5.25C8.72 5.25 9.82 5.74 10.62 6.54L12.02 5.14C10.85 3.97 9.26 3.25 7.5 3.25C5.74 3.25 4.15 3.97 2.98 5.14L4.38 6.54C5.18 5.74 6.28 5.25 7.5 5.25Z" />
-          <circle cx="7.5" cy="10" r="2" />
-        </svg>
-        <div className="flex items-center gap-0.5">
-          <div className="h-3 rounded-[2px] bg-gray-900 dark:bg-white" style={{ width: "22px" }} />
-          <div className="h-1.5 rounded-r-[1px] bg-gray-900 dark:bg-white" style={{ width: "2px" }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Tab Bar Component ────────────────────────────────────────────────────────
 
 function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
@@ -78,10 +48,6 @@ function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void 
             </button>
           );
         })}
-      </div>
-      {/* Home indicator */}
-      <div className="flex justify-center pb-2 pt-1">
-        <div className="w-28 h-1 bg-gray-900 dark:bg-white opacity-20 rounded-full" />
       </div>
     </div>
   );
@@ -146,34 +112,22 @@ export default function FuelCalculator() {
   };
 
   return (
-    <div className={dark ? "dark" : ""}>
-      <div className="min-h-screen bg-gray-200 dark:bg-gray-900 flex items-center justify-center p-4 transition-colors duration-300">
-        <div
-          className="w-full max-w-sm bg-[#f2f2f7] dark:bg-[#111113] rounded-[2.5rem] overflow-hidden relative flex flex-col"
-          style={{
-            boxShadow: "0 0 0 1.5px rgba(0,0,0,0.18), 0 20px 60px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.15)",
-            minHeight: "844px",
-            maxHeight: "844px",
-          }}
-        >
-          {/* Status bar */}
-          <StatusBar />
-
-          {/* Nav bar */}
-          <div className="px-6 pt-2 pb-3 flex-shrink-0">
-            <h1 className="text-[26px] font-bold tracking-tight text-gray-900 dark:text-white leading-tight">
-              {TAB_TITLES[activeTab]}
-            </h1>
-          </div>
-
-          {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto overscroll-none">
-            {tabContent[activeTab]}
-          </div>
-
-          {/* Tab bar */}
-          <TabBar active={activeTab} onChange={setActiveTab} />
+    <div className={dark ? "dark" : ""} style={{ height: "100dvh" }}>
+      <div className="h-full bg-[#f2f2f7] dark:bg-[#111113] flex flex-col transition-colors duration-300">
+        {/* Nav bar */}
+        <div className="px-5 pt-4 pb-3 flex-shrink-0 border-b border-black/5 dark:border-white/6 bg-[#f2f2f7]/80 dark:bg-[#111113]/80 backdrop-blur-sm">
+          <h1 className="text-[22px] font-bold tracking-tight text-gray-900 dark:text-white leading-tight">
+            {TAB_TITLES[activeTab]}
+          </h1>
         </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto overscroll-none">
+          {tabContent[activeTab]}
+        </div>
+
+        {/* Tab bar */}
+        <TabBar active={activeTab} onChange={setActiveTab} />
       </div>
     </div>
   );
