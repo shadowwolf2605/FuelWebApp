@@ -1,0 +1,27 @@
+{
+  "name": "Разход на гориво",
+  "short_name": "Разход",
+  "description": "Управление на автомобил — пътувания, разходи и поддръжка",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "lang": "bg",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Ново пътуване",
+      "url": "./",
+      "description": "Стартирай ново пътуване"
+    }
+  ]
+}
