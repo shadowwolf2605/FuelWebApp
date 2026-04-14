@@ -213,17 +213,21 @@ export default function Wrapped({ tripHistory, expenses, currency }: WrappedProp
   const totalKm     = yearTrips.reduce((s, t) => s + tripDistance(t), 0);
   const totalFuel   = yearTrips.reduce((s, t) => s + tripTotalCost(t), 0);
   const tripCount   = yearTrips.length;
-  const avgCons     = tripCount > 0
-    ? yearTrips.reduce((s, t) => s + tripConsumption(t), 0) / tripCount
-    : 0;
-
-  const sofiaVarnaTimes = totalKm > 0 ? Math.floor(totalKm / 450) : 0;
-  const longestDist     = tripCount > 0 ? Math.max(...yearTrips.map(t => tripDistance(t))) : 0;
-  const avgCostPerTrip  = tripCount > 0 ? totalFuel / tripCount : 0;
 
   const validYearTrips = yearTrips.filter(t => tripDistance(t) > 0);
+  const avgConsRaw  = validYearTrips.length > 0
+    ? validYearTrips.reduce((s, t) => s + tripConsumption(t), 0) / validYearTrips.length
+    : 0;
+  const avgCons = isFinite(avgConsRaw) ? avgConsRaw : 0;
+
+  const sofiaVarnaTimes = totalKm > 0 && isFinite(totalKm) ? Math.floor(totalKm / 450) : 0;
+  const longestDist     = validYearTrips.length > 0 ? Math.max(...validYearTrips.map(t => tripDistance(t))) : 0;
+  const avgCostPerTrip  = tripCount > 0 && isFinite(totalFuel) ? totalFuel / tripCount : 0;
+
   const bestTrip = validYearTrips.length > 0
-    ? validYearTrips.reduce((best, t) => tripConsumption(t) < tripConsumption(best) ? t : best, validYearTrips[0])
+    ? validYearTrips
+        .filter(t => isFinite(tripConsumption(t)))
+        .reduce((best, t) => best === null || tripConsumption(t) < tripConsumption(best) ? t : best, null as typeof validYearTrips[0] | null)
     : null;
 
   return (

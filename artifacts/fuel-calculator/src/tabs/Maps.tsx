@@ -54,7 +54,8 @@ function FindMyCar({ saved, onSave, onClear }: {
     return `https://maps.google.com/?q=${saved.lat},${saved.lon}`;
   }
 
-  const savedAgo = saved ? Math.floor((Date.now() - new Date(saved.timestamp).getTime()) / 60000) : 0;
+  const savedAgoMs = saved ? Date.now() - new Date(saved.timestamp).getTime() : 0;
+  const savedAgo = isNaN(savedAgoMs) ? 0 : Math.max(0, Math.floor(savedAgoMs / 60000));
 
   return (
     <Card className="overflow-hidden">
@@ -150,7 +151,7 @@ function GasStationFinder() {
             brand: (el.tags as Record<string, string>)?.brand,
             lat: el.lat as number,
             lon: el.lon as number,
-            distM: haversineM(lat, lon, el.lat as number, el.lon as number),
+            distM: (!isNaN(el.lat as number) && !isNaN(el.lon as number)) ? haversineM(lat, lon, el.lat as number, el.lon as number) : Infinity,
           })).sort((a: GasStation, b: GasStation) => a.distM - b.distM);
           setStations(list);
           if (list.length === 0) setError("Не са намерени бензиностанции в радиус 5 км");
@@ -333,7 +334,7 @@ function ParkingTimerCard({ timer, setTimer }: {
   const totalSec   = timer ? timer.durationMinutes * 60 : 0;
   const remainSec  = timer ? Math.max(0, totalSec - elapsedSec) : 0;
   const expired    = timer ? elapsedSec >= totalSec : false;
-  const progress   = timer ? Math.min(elapsedSec / totalSec, 1) : 0;
+  const progress   = timer && totalSec > 0 ? Math.min(elapsedSec / totalSec, 1) : 0;
   const remMin     = Math.floor(remainSec / 60);
   const remSecDisp = remainSec % 60;
   const warn       = remainSec > 0 && remainSec <= 600; // 10 minutes

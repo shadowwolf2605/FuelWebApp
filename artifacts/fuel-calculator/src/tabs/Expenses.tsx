@@ -263,7 +263,7 @@ function SellKeepCalc({ expenses, avgConsumption, currency }: { expenses: Expens
   const maintenanceBudget = parseNum(profile.maintenanceBudget);
   const avgFuelPrice = 1.79; // fallback €/L
 
-  const annualFuelCost = avgConsumption && annualKm
+  const annualFuelCost = avgConsumption && annualKm && isFinite(avgConsumption) && isFinite(annualKm)
     ? (annualKm * avgConsumption / 100) * avgFuelPrice : null;
 
   const annualExpenses = expenses.length > 0
@@ -399,7 +399,7 @@ function CarWashCard({ expenses, onAdd, onDelete, currency }: { expenses: Expens
   const [note, setNote] = useState("");
 
   const total = washes.reduce((s, e) => s + e.amount, 0);
-  const avg = washes.length > 0 ? total / washes.length : 0;
+  const avg = washes.length > 0 && isFinite(total) ? total / washes.length : 0;
   const lastWash = washes[0];
   const daysSince = lastWash ? Math.floor((Date.now() - new Date(lastWash.date).getTime()) / 86400000) : null;
 

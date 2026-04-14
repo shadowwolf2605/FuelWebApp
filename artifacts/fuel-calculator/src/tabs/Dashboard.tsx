@@ -1007,23 +1007,15 @@ function CarsSection({ cars, activeCar, activeCarId, setActiveCarId, addCar, upd
     setShowForm(false);
   }
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new window.Image();
-      img.onload = () => {
-        const maxW = 400;
-        const ratio = Math.min(maxW / img.width, maxW / img.height, 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width * ratio; canvas.height = img.height * ratio;
-        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setDraft(d => ({ ...d, photo: canvas.toDataURL("image/jpeg", 0.7) }));
-      };
-      img.src = ev.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setDraft(d => ({ ...d, photo: compressed }));
+    } catch {
+      alert("Грешка при зареждане на снимката. Опитай отново.");
+    }
   }
 
   if (showForm) {
@@ -1124,8 +1116,9 @@ function CarsSection({ cars, activeCar, activeCarId, setActiveCarId, addCar, upd
                 {(() => {
                   const carTrips = tripHistory.filter(t => t.carId === car.id);
                   const totalKm = carTrips.reduce((s, t) => s + (t.endKm - t.startKm), 0);
-                  const avgCons = carTrips.length >= 2
-                    ? carTrips.reduce((s, t) => s + (t.liters / Math.max(t.endKm - t.startKm, 1)) * 100, 0) / carTrips.length
+                  const validCarTrips = carTrips.filter(t => t.endKm - t.startKm > 0);
+                  const avgCons = validCarTrips.length >= 2
+                    ? validCarTrips.reduce((s, t) => s + (t.liters / (t.endKm - t.startKm)) * 100, 0) / validCarTrips.length
                     : null;
                   const expCount = allExpenses?.filter(e => e.carId === car.id).length ?? 0;
                   const maintCount = allMaintItems?.filter(m => m.carId === car.id).length ?? 0;
@@ -1728,7 +1721,7 @@ export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tr
         ) : (
           <motion.div key="start" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="space-y-4">
             <GpsCard onDistanceReady={() => { /* standalone GPS — no active trip */ }} />
-            <StartTripForm onStart={(t) => setActiveTrip({ ...t, carId: (activeCar?.id ?? effectiveCarId) || undefined })} currency={currency} defaultFuelType={activeCar?.fuelType} />
+            <StartTripForm onStart={(t) => setActiveTrip({ ...t, carId: activeCar?.id || undefined })} currency={currency} defaultFuelType={activeCar?.fuelType} />
           </motion.div>
         )}
       </AnimatePresence>

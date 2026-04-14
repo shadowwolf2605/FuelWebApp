@@ -833,7 +833,8 @@ function FinesReport({ expenses, currency, onUpdateExpense }: { expenses: Expens
       </div>
       <div className="divide-y divide-gray-100 dark:divide-white/[0.07]">
         {fines.sort((a, b) => (a.finePaid ? 1 : -1)).map(fine => {
-          const daysLeft = fine.fineDeadline ? Math.floor((new Date(fine.fineDeadline).getTime() - Date.now()) / 86400000) : null;
+          const deadlineMs = fine.fineDeadline ? new Date(fine.fineDeadline).getTime() : NaN;
+          const daysLeft = !isNaN(deadlineMs) ? Math.floor((deadlineMs - Date.now()) / 86400000) : null;
           return (
             <div key={fine.id} className="flex items-center gap-3 px-4 py-3">
               <div className="flex-1 min-w-0">
@@ -870,8 +871,8 @@ function PeriodComparison({ trips, expenses, currency }: { trips: CompletedTrip[
   const [periodB, setPeriodB] = useState(() => new Date().toISOString().slice(0, 7));
 
   function statsForPeriod(period: string) {
-    const t = trips.filter(tr => tr.endedAt.startsWith(period));
-    const e = expenses.filter(ex => ex.date.startsWith(period));
+    const t = trips.filter(tr => tr.endedAt && typeof tr.endedAt === "string" && tr.endedAt.startsWith(period));
+    const e = expenses.filter(ex => ex.date && typeof ex.date === "string" && ex.date.startsWith(period));
     const km = t.reduce((s, tr) => s + tripDistance(tr), 0);
     const fuel = t.reduce((s, tr) => s + tripTotalCost(tr), 0);
     const expCost = e.reduce((s, ex) => s + ex.amount, 0);
@@ -883,8 +884,8 @@ function PeriodComparison({ trips, expenses, currency }: { trips: CompletedTrip[
   const b = statsForPeriod(periodB);
 
   const months = Array.from(new Set([
-    ...trips.map(t => t.endedAt.slice(0, 7)),
-    ...expenses.map(e => e.date.slice(0, 7)),
+    ...trips.filter(t => t.endedAt && typeof t.endedAt === "string").map(t => t.endedAt.slice(0, 7)),
+    ...expenses.filter(e => e.date && typeof e.date === "string").map(e => e.date.slice(0, 7)),
   ])).sort().reverse().slice(0, 12);
 
   if (months.length < 2) return null;
@@ -1072,10 +1073,19 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
       const json = LZString.decompressFromEncodedURIComponent(code);
       if (!json) throw new Error("Невалиден код — не може да се декомпресира");
       const data = JSON.parse(json) as AllBackupData;
-      // Basic validation — must be a plain object with at least one known field
       if (typeof data !== "object" || data === null) throw new Error("Невалиден формат");
       if (!Array.isArray(data.trips) && !Array.isArray(data.cars) && !Array.isArray(data.fillUps))
         throw new Error("Непознат формат на backup");
+      // Ensure all array fields are actually arrays (prevent corrupted data from crashing app)
+      if (!Array.isArray(data.trips))           data.trips = [];
+      if (!Array.isArray(data.expenses))        data.expenses = [];
+      if (!Array.isArray(data.maintenance))     data.maintenance = [];
+      if (!Array.isArray(data.cars))            data.cars = [];
+      if (!Array.isArray(data.carDamages))      data.carDamages = [];
+      if (!Array.isArray(data.fillUps))         data.fillUps = [];
+      if (!Array.isArray(data.documents))       data.documents = [];
+      if (!Array.isArray(data.checklistItems))  data.checklistItems = [];
+      if (!Array.isArray(data.recurringExpenses)) data.recurringExpenses = [];
       onRestore(data);
       setRestoreStatus("ok");
       setRestoreCode("");
