@@ -19,21 +19,21 @@ export function useLocalStorage<T>(
         const next = typeof v === "function" ? (v as (p: T) => T)(prev) : v;
         try {
           localStorage.setItem(key, JSON.stringify(next));
+          return next; // success — update state
         } catch (err) {
           if (err instanceof DOMException && (err.name === "QuotaExceededError" || err.name === "NS_ERROR_DOM_QUOTA_REACHED")) {
             console.error(`[useLocalStorage] Quota exceeded for key "${key}". Data NOT saved.`);
-            // Show a one-time toast-style alert so the user knows data was lost
             if (!sessionStorage.getItem("fa_quota_warned")) {
               sessionStorage.setItem("fa_quota_warned", "1");
               setTimeout(() => {
-                alert("⚠️ Паметта на браузъра е пълна! Последните данни НЕ са запазени. Моля, изтрий стари снимки или направи резервно копие.");
+                alert("⚠️ Паметта на браузъра е пълна! Данните НЕ са запазени.\n\nПрепоръка: Направи резервно копие от Настройки и изтрий стари снимки.");
               }, 100);
             }
           } else {
             console.error(`[useLocalStorage] Failed to save key "${key}":`, err);
           }
+          return prev; // revert state — do NOT show data that wasn't actually saved
         }
-        return next;
       });
     },
     [key],

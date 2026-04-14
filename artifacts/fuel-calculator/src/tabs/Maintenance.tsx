@@ -6,7 +6,7 @@ import {
   Shield, FileCheck, Car, BookOpen, Pencil, ShieldAlert, CheckCircle2,
 } from "lucide-react";
 import { Card, Field, Divider, ActionButton, EmptyState } from "../components/ui";
-import { parseNum, daysUntil, todayISO } from "../utils/helpers";
+import { parseNum, daysUntil, todayISO, compressImage } from "../utils/helpers";
 import type { MaintenanceItem, CarDocument, ExpiryDates, CarProfile, CarDamage, Expense } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -32,28 +32,6 @@ function urgencyBadge(nextDate: string) {
   if (days <= 30) return { label: `Остават ${days}д`, color: "text-orange-500 bg-orange-500/12" };
   if (days <= 90) return { label: `Остават ${days}д`, color: "text-yellow-600 bg-yellow-500/12" };
   return { label: `Остават ${days}д`, color: "text-green-600 bg-green-500/12" };
-}
-
-async function compressImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new window.Image();
-      img.onload = () => {
-        const maxW = 900;
-        const ratio = Math.min(maxW / img.width, maxW / img.height, 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width * ratio;
-        canvas.height = img.height * ratio;
-        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.7));
-      };
-      img.onerror = reject;
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 // ─── Add Maintenance Form ─────────────────────────────────────────────────────

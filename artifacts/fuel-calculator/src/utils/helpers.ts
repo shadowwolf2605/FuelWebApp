@@ -39,3 +39,26 @@ export function daysUntil(dateStr: string): number {
 export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+/** Compress an image file to max 900px wide/tall at 70% JPEG quality before storing in localStorage */
+export async function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const maxW = 900;
+        const ratio = Math.min(maxW / img.width, maxW / img.height, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}

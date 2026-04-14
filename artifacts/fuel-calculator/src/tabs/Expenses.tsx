@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Card, Field, Divider, ActionButton, EmptyState } from "../components/ui";
-import { parseNum, todayISO } from "../utils/helpers";
+import { parseNum, todayISO, compressImage } from "../utils/helpers";
 import type { Expense, CarProfile, CompletedTrip, RecurringExpense } from "../types";
 import { tripConsumption } from "../types";
 
@@ -45,12 +45,15 @@ function AddExpenseForm({ onAdd, onClose, currency }: { onAdd: (e: Expense) => v
   const amount = parseNum(amountText);
   const canAdd = amount !== null && amount > 0 && date.length > 0;
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setPhoto(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setPhoto(compressed);
+    } catch {
+      alert("Грешка при зареждане на снимката. Опитай отново.");
+    }
   }
 
   function submit() {

@@ -8,7 +8,7 @@ import {
   Lightbulb, TrendingUp, Mic, MicOff,
 } from "lucide-react";
 import { Card, Field, StatPill, PulsingDot, Divider, ActionButton, EmptyState } from "../components/ui";
-import { parseNum, formatDate, formatShortDate, formatElapsed, todayISO } from "../utils/helpers";
+import { parseNum, formatDate, formatShortDate, formatElapsed, todayISO, compressImage } from "../utils/helpers";
 import { haversineM, geocodeAddress, routeDistanceKm } from "../utils/geo";
 import type { ActiveTrip, CompletedTrip, Expense, CarProfile, FuelType, FuelFillUp } from "../types";
 import { tripConsumption, tripDistance, tripTotalCost, FUEL_TYPE_LABELS, FUEL_TYPE_COLORS } from "../types";
@@ -276,20 +276,26 @@ function StartTripForm({ onStart, currency, defaultFuelType }: { onStart: (t: Ac
   const km = parseNum(startKm); const lt = parseNum(liters); const pr = parseNum(price);
   const ok = km !== null && km > 0 && lt !== null && lt > 0 && pr !== null && pr > 0;
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setReceiptPhoto(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setReceiptPhoto(compressed);
+    } catch {
+      alert("Грешка при зареждане на снимката. Опитай отново.");
+    }
   }
 
-  function handleOdometerPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleOdometerPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setOdometerPhoto(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setOdometerPhoto(compressed);
+    } catch {
+      alert("Грешка при зареждане на снимката. Опитай отново.");
+    }
   }
 
   return (
@@ -1532,12 +1538,15 @@ function FillUpsSection({ fillUps, onAdd, onDelete, currency }: {
     setLiters(""); setPrice(""); setStation(""); setPhoto(undefined); setShowForm(false);
   }
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setPhoto(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setPhoto(compressed);
+    } catch {
+      alert("Грешка при зареждане на снимката. Опитай отново.");
+    }
   }
 
   return (
