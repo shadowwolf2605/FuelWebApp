@@ -801,7 +801,7 @@ function DriverScoreCard({ trips }: { trips: CompletedTrip[] }) {
           </div>
           <div className="flex gap-2">
             {[
-              { label: "Разход", value: `${(currentTrips.reduce((s,t)=>s+tripConsumption(t),0)/currentTrips.length).toFixed(1)} л` },
+              { label: "Разход", value: currentTrips.length > 0 ? `${(currentTrips.reduce((s,t)=>s+tripConsumption(t),0)/currentTrips.length).toFixed(1)} л` : "—" },
               { label: "Пътувания", value: String(currentTrips.length) },
             ].map(s => (
               <div key={s.label} className="flex-1 bg-gray-50 dark:bg-[#2c2c30] rounded-xl p-2 text-center">
@@ -1270,7 +1270,8 @@ function SpeedometerDashboard({ trips }: { trips: CompletedTrip[] }) {
   if (trips.length === 0) return null;
 
   const totalKm = trips.reduce((s, t) => s + tripDistance(t), 0);
-  const avgCons = trips.reduce((s, t) => s + tripConsumption(t), 0) / trips.length;
+  const validTrips = trips.filter(t => tripDistance(t) > 0);
+  const avgCons = validTrips.length > 0 ? validTrips.reduce((s, t) => s + tripConsumption(t), 0) / validTrips.length : 0;
   const efficiency = Math.max(0, 100 - avgCons * 7);
 
   const consColor = avgCons < 7 ? "#22c55e" : avgCons < 10 ? "#f97316" : "#ef4444";

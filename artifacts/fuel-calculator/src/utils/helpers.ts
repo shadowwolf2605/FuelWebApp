@@ -31,9 +31,13 @@ export function formatElapsed(startIso: string, now: Date) {
 
 export function daysUntil(dateStr: string): number {
   if (!dateStr) return 9999;
-  const ms = new Date(dateStr).getTime();
-  if (isNaN(ms)) return 9999;
-  return Math.floor((ms - Date.now()) / (1000 * 60 * 60 * 24));
+  // Parse as end-of-day local time to avoid timezone off-by-one errors
+  // "2026-04-20" should mean "expires on April 20" not "expired at midnight UTC"
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return 9999;
+  const expiry = new Date(y, m - 1, d, 23, 59, 59).getTime();
+  if (isNaN(expiry)) return 9999;
+  return Math.floor((expiry - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
 export function todayISO(): string {

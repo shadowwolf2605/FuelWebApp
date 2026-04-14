@@ -144,7 +144,7 @@ export interface CarProfile {
   expiries?: ExpiryDates;  // per-car document expiry dates
 }
 
-export function tripDistance(t: CompletedTrip) { return t.endKm - t.startKm; }
+export function tripDistance(t: CompletedTrip) { return Math.max(0, t.endKm - t.startKm); }
 export function tripConsumption(t: CompletedTrip) {
   const d = tripDistance(t);
   return d > 0 ? (t.liters / d) * 100 : 0;

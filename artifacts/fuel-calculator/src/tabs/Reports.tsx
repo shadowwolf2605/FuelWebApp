@@ -514,7 +514,7 @@ function YearlyReport({ trips, expenses, maint, currency }: {
                     <span className="text-[12px] text-gray-600 dark:text-gray-400 flex-1">{EXPENSE_BG[cat] ?? cat}</span>
                     <span className="text-[12px] font-semibold text-gray-900 dark:text-white tabular-nums">{amt.toFixed(2)} {currency}</span>
                     <div className="w-16 h-1.5 bg-gray-100 dark:bg-[#2c2c30] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length], width: `${(amt / totalExp) * 100}%` }} />
+                      <div className="h-full rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length], width: `${totalExp > 0 ? (amt / totalExp) * 100 : 0}%` }} />
                     </div>
                   </div>
                 ))}
