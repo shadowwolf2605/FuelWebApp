@@ -131,10 +131,16 @@ export function useLocalStorage<T>(
       hasWritten.current = true;
       setState((prev) => {
         const next = typeof v === "function" ? (v as (p: T) => T)(prev) : v;
-        // Async write — no size limit, no QuotaExceededError
+
+        // Primary: IndexedDB — no size limit, source of truth
         dbSet(key, next).catch((err) =>
-          console.error(`[storage] Failed to save "${key}":`, err),
+          console.error(`[storage] Failed to save "${key}" to IndexedDB:`, err),
         );
+
+        // Cache in localStorage so the next app open reads fresh data instantly.
+        // Silently skip if localStorage is full (IndexedDB still has it).
+        try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* quota full — ok */ }
+
         return next;
       });
     },
