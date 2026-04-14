@@ -298,14 +298,6 @@ export default function FuelCalculator() {
 
   function addFillUp(f: FuelFillUp) { setFillUps(fs => [{ ...f, carId: effectiveCarId || undefined }, ...fs]); }
 
-  function clearAllPhotos() {
-    setTripHistory(h => h.map(t => ({ ...t, photo: undefined })));
-    setExpenses(ex => ex.map(e => ({ ...e, photo: undefined })));
-    setFillUps(fs => fs.map(f => ({ ...f, photo: undefined })));
-    setDocuments(ds => ds.map(d => ({ ...d, dataUrl: "" })));
-    setCarDamages(ds => ds.map(d => ({ ...d, photo: undefined })));
-    setCars(cs => cs.map(c => ({ ...c, photo: undefined })));
-  }
   function deleteFillUp(id: string) { setFillUps(fs => fs.filter(f => f.id !== id)); }
 
   function addCar(car: CarProfile)         { setCars(cs => [...cs, car]); setActiveCarId(car.id); }
@@ -454,7 +446,6 @@ export default function FuelCalculator() {
         activeCarId={activeCarId}
         activeTrip={activeTrip}
         onUpdateExpense={updateExpense}
-        onClearPhotos={clearAllPhotos}
         cars={cars}
         carDamages={carDamageItems}
         fillUps={carFillUps}

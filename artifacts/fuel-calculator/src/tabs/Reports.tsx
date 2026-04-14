@@ -4,7 +4,7 @@ import {
   FileDown, Mail, Link2, BarChart3, Calendar, Receipt,
   TrendingUp, Download, ChevronRight, CheckCircle2, Copy,
   Fuel, Wrench, Wallet, Car, AlertTriangle, Upload, Database,
-  QrCode, Shield, ClipboardPaste, HardDrive, Trash2,
+  QrCode, Shield, ClipboardPaste,
 } from "lucide-react";
 import QRCode from "qrcode";
 import LZString from "lz-string";
@@ -987,75 +987,6 @@ interface AllBackupData {
   activeTrip?: ActiveTrip | null;
 }
 
-// ─── Storage Card ─────────────────────────────────────────────────────────────
-
-function StorageCard({ onClearPhotos }: { onClearPhotos: () => void }) {
-  const [used, setUsed] = useState(0);
-  const LIMIT = 5 * 1024 * 1024; // 5MB
-
-  function calcUsed() {
-    let total = 0;
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i) ?? "";
-      const val = localStorage.getItem(key) ?? "";
-      total += key.length + val.length;
-    }
-    setUsed(total * 2); // UTF-16 = 2 bytes per char
-  }
-
-  useEffect(() => { calcUsed(); }, []);
-
-  const pct = Math.min(100, (used / LIMIT) * 100);
-  const usedMB = (used / (1024 * 1024)).toFixed(2);
-  const color = pct > 80 ? "bg-red-500" : pct > 50 ? "bg-orange-500" : "bg-green-500";
-  const textColor = pct > 80 ? "text-red-500" : pct > 50 ? "text-orange-500" : "text-green-600";
-
-  function handleClear() {
-    if (!window.confirm("Ще изтрие снимките от всички пътувания и разходи (данните остават). Продължи?")) return;
-    onClearPhotos();
-    setTimeout(calcUsed, 200);
-  }
-
-  return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-[#1c1c20] rounded-2xl overflow-hidden shadow-sm">
-      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/[0.07]">
-        <div className="w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center"><HardDrive size={15} className="text-white" /></div>
-        <div>
-          <p className="text-[15px] font-semibold text-gray-900 dark:text-white">Памет</p>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500">Заето място в браузъра</p>
-        </div>
-        <span className={`ml-auto text-[13px] font-bold tabular-nums ${textColor}`}>{usedMB} / 5 MB</span>
-      </div>
-      <div className="px-4 py-4 space-y-3">
-        <div className="h-2.5 bg-gray-100 dark:bg-[#2c2c30] rounded-full overflow-hidden">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className={`h-full rounded-full ${color}`}
-          />
-        </div>
-        {pct > 50 && (
-          <p className={`text-[12px] ${textColor} font-medium`}>
-            {pct > 80
-              ? "⚠️ Паметта е почти пълна! Изчисти снимките за да продължиш да записваш данни."
-              : "Паметта се запълва. Препоръчително е да изчистиш старите снимки."}
-          </p>
-        )}
-        <button
-          onClick={handleClear}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-500 text-[13px] font-semibold active:scale-95 transition-transform"
-        >
-          <Trash2 size={14} />
-          Изчисти снимките (запази данните)
-        </button>
-        <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">
-          Изтрива само снимките — всички пътувания, разходи и км остават.
-        </p>
-      </div>
-    </motion.div>
-  );
-}
 
 function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documents, checklistItems, savedLocation, expiries, recurringExpenses, currency, activeCarId, activeTrip, onRestore }: {
   trips: CompletedTrip[];
@@ -1302,7 +1233,6 @@ interface ReportsProps {
   activeTrip: ActiveTrip | null;
   onUpdateExpense: (e: Expense) => void;
   onImport: (data: AllBackupData) => void;
-  onClearPhotos: () => void;
   cars: CarProfile[];
   carDamages: CarDamage[];
   fillUps: FuelFillUp[];
@@ -1313,7 +1243,7 @@ interface ReportsProps {
   recurringExpenses: RecurringExpense[];
 }
 
-export default function Reports({ tripHistory, expenses, maintenanceItems, currency, activeCarId, activeTrip, onUpdateExpense, onImport, onClearPhotos, cars, carDamages, fillUps, documents, checklistItems, savedLocation, expiries, recurringExpenses }: ReportsProps) {
+export default function Reports({ tripHistory, expenses, maintenanceItems, currency, activeCarId, activeTrip, onUpdateExpense, onImport, cars, carDamages, fillUps, documents, checklistItems, savedLocation, expiries, recurringExpenses }: ReportsProps) {
   const currentYear = new Date().getFullYear();
   return (
     <div className="space-y-4 px-4 pb-8 pt-2">
@@ -1323,7 +1253,6 @@ export default function Reports({ tripHistory, expenses, maintenanceItems, curre
       <PeriodComparison trips={tripHistory} expenses={expenses} currency={currency} />
       <FinesReport expenses={expenses} currency={currency} onUpdateExpense={onUpdateExpense} />
       <QuickActions trips={tripHistory} expenses={expenses} maint={maintenanceItems} currency={currency} />
-      <StorageCard onClearPhotos={onClearPhotos} />
       <BackupCard
         trips={tripHistory} expenses={expenses} maint={maintenanceItems}
         cars={cars} carDamages={carDamages} fillUps={fillUps} documents={documents}
