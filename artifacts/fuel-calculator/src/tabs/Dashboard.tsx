@@ -818,7 +818,7 @@ function DriverScoreCard({ trips }: { trips: CompletedTrip[] }) {
 
 // ─── History Row ──────────────────────────────────────────────────────────────
 
-function HistoryRow({ trip, onDelete, currency, allTrips }: { trip: CompletedTrip; onDelete: () => void; currency: string; allTrips: CompletedTrip[] }) {
+function HistoryRow({ trip, onDelete, onUpdatePhoto, currency, allTrips }: { trip: CompletedTrip; onDelete: () => void; onUpdatePhoto: (photo: string) => void; currency: string; allTrips: CompletedTrip[] }) {
   const cons = tripConsumption(trip);
   const cost = tripTotalCost(trip);
   const dist = tripDistance(trip);
@@ -826,6 +826,14 @@ function HistoryRow({ trip, onDelete, currency, allTrips }: { trip: CompletedTri
   const [shared, setShared] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try { onUpdatePhoto(await compressImage(file)); } catch { /* ignore */ }
+    e.target.value = "";
+  }
   const similar = dist > 0 ? allTrips.filter(t => t.id !== trip.id && tripDistance(t) > 5 && Math.abs(tripDistance(t) - dist) / dist <= 0.2) : [];
 
   function shareTrip() {
@@ -861,6 +869,14 @@ function HistoryRow({ trip, onDelete, currency, allTrips }: { trip: CompletedTri
             <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${consColor}`}><Gauge size={10} />{cons.toFixed(2)} л/100км</span>
             <button onClick={shareTrip} className={`transition-colors ${shared ? "text-green-500" : "text-blue-400 hover:text-blue-500"}`}>
               {shared ? <Copy size={13} /> : <Share2 size={13} />}
+            </button>
+            <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
+            <button
+              onClick={() => photoInputRef.current?.click()}
+              title={trip.photo ? "Замени снимката" : "Добави касова бележка"}
+              className={`transition-colors ${trip.photo ? "text-green-500" : "text-gray-300 dark:text-gray-600 hover:text-green-500"}`}
+            >
+              <Camera size={13} />
             </button>
             <button onClick={onDelete} className="text-red-400 hover:text-red-500"><Trash2 size={13} /></button>
           </div>
@@ -1649,6 +1665,7 @@ interface DashboardProps {
   allFillUps: import("../types").FuelFillUp[];          // unfiltered
   addTrip: (t: CompletedTrip) => void;
   deleteTrip: (id: string) => void;
+  updateTripPhoto: (id: string, photo: string) => void;
   currency: string;
   expenses: Expense[];
   cars: CarProfile[];
@@ -1663,7 +1680,7 @@ interface DashboardProps {
   deleteFillUp: (id: string) => void;
 }
 
-export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tripHistory, allTrips, allExpenses, allMaintItems, allDamages, allFillUps, addTrip, deleteTrip, currency, expenses, cars, activeCar, activeCarId, setActiveCarId, addCar, updateCar, deleteCar, fillUps, addFillUp, deleteFillUp }: DashboardProps) {
+export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tripHistory, allTrips, allExpenses, allMaintItems, allDamages, allFillUps, addTrip, deleteTrip, updateTripPhoto, currency, expenses, cars, activeCar, activeCarId, setActiveCarId, addCar, updateCar, deleteCar, fillUps, addFillUp, deleteFillUp }: DashboardProps) {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [historySort, setHistorySort] = useState<"date" | "dist" | "cons">("date");
   const sortedHistory = [...tripHistory].sort((a, b) => {
@@ -1773,7 +1790,7 @@ export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tr
           <div className="space-y-2.5">
             <AnimatePresence>
               {(showAllHistory ? sortedHistory : sortedHistory.slice(0, 3)).map((t) => (
-                <HistoryRow key={t.id} trip={t} onDelete={() => deleteTrip(t.id)} currency={currency} allTrips={tripHistory} />
+                <HistoryRow key={t.id} trip={t} onDelete={() => deleteTrip(t.id)} onUpdatePhoto={(photo) => updateTripPhoto(t.id, photo)} currency={currency} allTrips={tripHistory} />
               ))}
             </AnimatePresence>
           </div>
