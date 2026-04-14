@@ -31,9 +31,9 @@ export function formatElapsed(startIso: string, now: Date) {
 
 export function daysUntil(dateStr: string): number {
   if (!dateStr) return 9999;
-  return Math.floor(
-    (new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-  );
+  const ms = new Date(dateStr).getTime();
+  if (isNaN(ms)) return 9999;
+  return Math.floor((ms - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
 export function todayISO(): string {

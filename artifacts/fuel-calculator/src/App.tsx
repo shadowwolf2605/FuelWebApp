@@ -1,7 +1,7 @@
-import FuelCalculator from "@/pages/FuelCalculator";
+import { WrappedFuelCalculator } from "./pages/FuelCalculator";
 
 function App() {
-  return <FuelCalculator />;
+  return <WrappedFuelCalculator />;
 }
 
 export default App;

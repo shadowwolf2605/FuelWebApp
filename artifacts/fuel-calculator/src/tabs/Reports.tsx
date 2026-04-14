@@ -1,17 +1,21 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileDown, Mail, Link2, BarChart3, Calendar, Receipt,
   TrendingUp, Download, ChevronRight, CheckCircle2, Copy,
-  Fuel, Wrench, Wallet, Car, AlertTriangle,
+  Fuel, Wrench, Wallet, Car, AlertTriangle, Upload, Database,
+  QrCode, Shield, ClipboardPaste,
 } from "lucide-react";
+import QRCode from "qrcode";
+import LZString from "lz-string";
+import Wrapped from "./Wrapped";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, CartesianGrid,
 } from "recharts";
 import { Card, EmptyState } from "../components/ui";
 import { formatShortDate } from "../utils/helpers";
-import type { CompletedTrip, Expense, MaintenanceItem } from "../types";
+import type { CompletedTrip, ActiveTrip, Expense, MaintenanceItem, CarProfile, CarDamage, FuelFillUp, ChecklistItem, SavedLocation, ExpiryDates, RecurringExpense, CarDocument } from "../types";
 import { tripDistance, tripConsumption, tripTotalCost } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -35,7 +39,7 @@ const PIE_COLORS = ["#3b82f6", "#f97316", "#22c55e", "#a855f7", "#ef4444", "#eab
 
 // ─── PDF generation (print window) ───────────────────────────────────────────
 
-function buildPrintHTML(trips: CompletedTrip[], expenses: Expense[], maint: MaintenanceItem[], period: string) {
+function buildPrintHTML(trips: CompletedTrip[], expenses: Expense[], maint: MaintenanceItem[], period: string, currency = "€") {
   const totalKm = trips.reduce((s, t) => s + tripDistance(t), 0);
   const totalFuel = trips.reduce((s, t) => s + tripTotalCost(t), 0);
   const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
@@ -74,8 +78,8 @@ function buildPrintHTML(trips: CompletedTrip[], expenses: Expense[], maint: Main
   <div class="stat-grid">
     <div class="stat"><div class="stat-val">${trips.length}</div><div class="stat-lbl">Пътувания</div></div>
     <div class="stat"><div class="stat-val">${totalKm.toFixed(0)} км</div><div class="stat-lbl">Изминати</div></div>
-    <div class="stat"><div class="stat-val">${totalFuel.toFixed(2)} €</div><div class="stat-lbl">Гориво</div></div>
-    <div class="stat"><div class="stat-val">${grand.toFixed(2)} €</div><div class="stat-lbl">Всичко</div></div>
+    <div class="stat"><div class="stat-val">${totalFuel.toFixed(2)} ${currency}</div><div class="stat-lbl">Гориво</div></div>
+    <div class="stat"><div class="stat-val">${grand.toFixed(2)} ${currency}</div><div class="stat-lbl">Всичко</div></div>
   </div>
 
   <h2>Пътувания (${trips.length})</h2>
@@ -89,10 +93,10 @@ function buildPrintHTML(trips: CompletedTrip[], expenses: Expense[], maint: Main
       <td>${tripDistance(t).toFixed(1)} км</td>
       <td>${t.liters.toFixed(1)} л</td>
       <td>${tripConsumption(t).toFixed(2)} л/100км</td>
-      <td>${tripTotalCost(t).toFixed(2)} €</td>
+      <td>${tripTotalCost(t).toFixed(2)} ${currency}</td>
       <td>${t.note || "—"}</td>
     </tr>`).join("")}
-    <tr class="sum-row"><td colspan="6">Общо гориво</td><td>${totalFuel.toFixed(2)} €</td><td></td></tr>
+    <tr class="sum-row"><td colspan="6">Общо гориво</td><td>${totalFuel.toFixed(2)} ${currency}</td><td></td></tr>
   </table>`}
 
   <h2>Разходи (${expenses.length})</h2>
@@ -102,10 +106,10 @@ function buildPrintHTML(trips: CompletedTrip[], expenses: Expense[], maint: Main
     ${expenses.map(e => `<tr>
       <td>${e.date}</td>
       <td>${EXPENSE_BG[e.category] ?? e.category}</td>
-      <td>${e.amount.toFixed(2)} €</td>
+      <td>${e.amount.toFixed(2)} ${currency}</td>
       <td>${e.note || "—"}</td>
     </tr>`).join("")}
-    <tr class="sum-row"><td colspan="2">Общо разходи</td><td>${totalExp.toFixed(2)} €</td><td></td></tr>
+    <tr class="sum-row"><td colspan="2">Общо разходи</td><td>${totalExp.toFixed(2)} ${currency}</td><td></td></tr>
   </table>`}
 
   <h2>Поддръжка (${maint.length})</h2>
@@ -116,15 +120,15 @@ function buildPrintHTML(trips: CompletedTrip[], expenses: Expense[], maint: Main
       <td>${m.doneDate}</td>
       <td>${m.title}</td>
       <td>${m.mileage > 0 ? m.mileage.toLocaleString() : "—"}</td>
-      <td>${m.cost > 0 ? m.cost.toFixed(2) + " €" : "—"}</td>
+      <td>${m.cost > 0 ? m.cost.toFixed(2) + " " + currency : "—"}</td>
       <td>${m.note || "—"}</td>
     </tr>`).join("")}
-    <tr class="sum-row"><td colspan="3">Общо поддръжка</td><td>${totalMaint.toFixed(2)} €</td><td></td></tr>
+    <tr class="sum-row"><td colspan="3">Общо поддръжка</td><td>${totalMaint.toFixed(2)} ${currency}</td><td></td></tr>
   </table>`}
 
   <div class="total-box">
     <span style="font-size:15px;font-weight:600">Обща сума на разходите</span>
-    <span class="total-val">${grand.toFixed(2)} €</span>
+    <span class="total-val">${grand.toFixed(2)} ${currency}</span>
   </div>
 </body>
 </html>`;
@@ -140,8 +144,8 @@ function openPrintWindow(html: string) {
 
 // ─── Quick Actions Card ───────────────────────────────────────────────────────
 
-function QuickActions({ trips, expenses, maint }: {
-  trips: CompletedTrip[]; expenses: Expense[]; maint: MaintenanceItem[];
+function QuickActions({ trips, expenses, maint, currency }: {
+  trips: CompletedTrip[]; expenses: Expense[]; maint: MaintenanceItem[]; currency: string;
 }) {
   const [copied, setCopied] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -154,7 +158,7 @@ function QuickActions({ trips, expenses, maint }: {
 
   function handlePDF() {
     const period = "Всички данни";
-    const html = buildPrintHTML(trips, expenses, maint, period);
+    const html = buildPrintHTML(trips, expenses, maint, period, currency);
     openPrintWindow(html);
   }
 
@@ -164,11 +168,11 @@ function QuickActions({ trips, expenses, maint }: {
       `Отчет за автомобил — ${new Date().toLocaleDateString("bg-BG")}\n\n` +
       `Пътувания: ${trips.length} бр.\n` +
       `Изминати км: ${totalKm.toFixed(0)} км\n` +
-      `Гориво: ${totalFuel.toFixed(2)} €\n` +
-      `Разходи: ${totalExp.toFixed(2)} €\n` +
-      `Поддръжка: ${totalMaint.toFixed(2)} €\n` +
+      `Гориво: ${totalFuel.toFixed(2)} ${currency}\n` +
+      `Разходи: ${totalExp.toFixed(2)} ${currency}\n` +
+      `Поддръжка: ${totalMaint.toFixed(2)} ${currency}\n` +
       `─────────────────\n` +
-      `ОБЩО: ${grand.toFixed(2)} €\n\n` +
+      `ОБЩО: ${grand.toFixed(2)} ${currency}\n\n` +
       `Генериран от Разход на гориво`,
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -193,7 +197,7 @@ function QuickActions({ trips, expenses, maint }: {
       setTimeout(() => setCopied(false), 3000);
     }).catch(() => {
       navigator.clipboard.writeText(
-        `Отчет ${summary.date}: ${summary.trips} пъту., ${summary.km} км, ${summary.total} €`
+        `Отчет ${summary.date}: ${summary.trips} пъту., ${summary.km} км, ${summary.total} ${currency}`
       );
       setCopied(true);
       setTimeout(() => setCopied(false), 3000);
@@ -229,7 +233,7 @@ function QuickActions({ trips, expenses, maint }: {
 
   return (
     <Card className="overflow-hidden">
-      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/6">
+      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/[0.07]">
         <div className="w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center">
           <Download size={15} className="text-white" />
         </div>
@@ -241,7 +245,7 @@ function QuickActions({ trips, expenses, maint }: {
       <div className="divide-y divide-gray-100 dark:divide-white/6">
         {actions.map((a, i) => (
           <motion.button key={i} onClick={a.onClick} whileTap={{ scale: 0.98 }}
-            className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-white/4 transition-colors">
+            className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-[#323238] transition-colors">
             <div className={`w-10 h-10 rounded-2xl ${a.bg} flex items-center justify-center flex-shrink-0`}>{a.icon}</div>
             <div className="flex-1 min-w-0">
               <p className="text-[14px] font-semibold text-gray-900 dark:text-white">{a.title}</p>
@@ -261,8 +265,8 @@ function QuickActions({ trips, expenses, maint }: {
 
 // ─── Monthly Report ───────────────────────────────────────────────────────────
 
-function MonthlyReport({ trips, expenses, maint }: {
-  trips: CompletedTrip[]; expenses: Expense[]; maint: MaintenanceItem[];
+function MonthlyReport({ trips, expenses, maint, currency }: {
+  trips: CompletedTrip[]; expenses: Expense[]; maint: MaintenanceItem[]; currency: string;
 }) {
   const now = new Date();
   const curMonth = monthKey(now.toISOString());
@@ -301,7 +305,7 @@ function MonthlyReport({ trips, expenses, maint }: {
 
   return (
     <Card className="overflow-hidden">
-      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/6">
+      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/[0.07]">
         <div className="w-8 h-8 rounded-xl bg-green-500 flex items-center justify-center">
           <Calendar size={15} className="text-white" />
         </div>
@@ -320,12 +324,12 @@ function MonthlyReport({ trips, expenses, maint }: {
           {/* Summary stats */}
           <div className="grid grid-cols-2 gap-2">
             {[
-              { icon: <Fuel size={14} />, color: "text-blue-500 bg-blue-500/10", label: "Гориво", value: `${fuelCost.toFixed(2)} €` },
-              { icon: <Wallet size={14} />, color: "text-orange-500 bg-orange-500/10", label: "Разходи", value: `${expCost.toFixed(2)} €` },
-              { icon: <Wrench size={14} />, color: "text-purple-500 bg-purple-500/10", label: "Поддръжка", value: `${maintCost.toFixed(2)} €` },
+              { icon: <Fuel size={14} />, color: "text-blue-500 bg-blue-500/10", label: "Гориво", value: `${fuelCost.toFixed(2)} ${currency}` },
+              { icon: <Wallet size={14} />, color: "text-orange-500 bg-orange-500/10", label: "Разходи", value: `${expCost.toFixed(2)} ${currency}` },
+              { icon: <Wrench size={14} />, color: "text-purple-500 bg-purple-500/10", label: "Поддръжка", value: `${maintCost.toFixed(2)} ${currency}` },
               { icon: <Car size={14} />, color: "text-green-500 bg-green-500/10", label: "Изминати", value: `${totalKm.toFixed(0)} км` },
             ].map((s, i) => (
-              <div key={i} className="bg-gray-50 dark:bg-white/4 rounded-xl p-3 flex items-center gap-2">
+              <div key={i} className="bg-gray-50 dark:bg-[#2c2c30] rounded-xl p-3 flex items-center gap-2">
                 <div className={`w-7 h-7 rounded-lg ${s.color} flex items-center justify-center flex-shrink-0`}>{s.icon}</div>
                 <div className="min-w-0">
                   <p className="text-[10px] text-gray-400 leading-none">{s.label}</p>
@@ -338,7 +342,7 @@ function MonthlyReport({ trips, expenses, maint }: {
           {/* Total */}
           <div className="flex items-center justify-between bg-blue-500/8 dark:bg-blue-500/15 border border-blue-500/20 rounded-xl px-4 py-3">
             <span className="text-[13px] font-semibold text-gray-900 dark:text-white">Общо за месеца</span>
-            <span className="text-[18px] font-bold text-blue-500 tabular-nums">{grand.toFixed(2)} €</span>
+            <span className="text-[18px] font-bold text-blue-500 tabular-nums">{grand.toFixed(2)} {currency}</span>
           </div>
 
           {/* Weekly fuel bar chart */}
@@ -350,7 +354,7 @@ function MonthlyReport({ trips, expenses, maint }: {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(v: number) => [`${v.toFixed(2)} €`, "Гориво"]}
+                  <Tooltip formatter={(v: number) => [`${v.toFixed(2)} ${currency}`, "Гориво"]}
                     contentStyle={{ borderRadius: 8, border: "none", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                   <Bar dataKey="fuel" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -367,7 +371,7 @@ function MonthlyReport({ trips, expenses, maint }: {
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={42} outerRadius={68} dataKey="value" paddingAngle={3}>
                     {pieData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => [`${v.toFixed(2)} €`]}
+                  <Tooltip formatter={(v: number) => [`${v.toFixed(2)} ${currency}`]}
                     contentStyle={{ borderRadius: 8, border: "none", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                   <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ fontSize: 11, color: "#6b7280" }}>{v}</span>} />
                 </PieChart>
@@ -382,8 +386,8 @@ function MonthlyReport({ trips, expenses, maint }: {
 
 // ─── Yearly Report ────────────────────────────────────────────────────────────
 
-function YearlyReport({ trips, expenses, maint }: {
-  trips: CompletedTrip[]; expenses: Expense[]; maint: MaintenanceItem[];
+function YearlyReport({ trips, expenses, maint, currency }: {
+  trips: CompletedTrip[]; expenses: Expense[]; maint: MaintenanceItem[]; currency: string;
 }) {
   const years = Array.from(new Set([
     ...trips.map(t => yearOf(t.endedAt)),
@@ -421,7 +425,7 @@ function YearlyReport({ trips, expenses, maint }: {
 
   return (
     <Card className="overflow-hidden">
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-gray-100 dark:border-white/6">
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-gray-100 dark:border-white/[0.07]">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center">
             <TrendingUp size={15} className="text-white" />
@@ -435,7 +439,7 @@ function YearlyReport({ trips, expenses, maint }: {
         <div className="flex gap-1">
           {years.slice(0, 3).map(y => (
             <button key={y} onClick={() => setYear(y)}
-              className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all ${y === year ? "bg-indigo-500 text-white" : "bg-gray-100 dark:bg-white/8 text-gray-500"}`}>
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all ${y === year ? "bg-indigo-500 text-white" : "bg-gray-100 dark:bg-[#2c2c30] text-gray-500"}`}>
               {y}
             </button>
           ))}
@@ -453,10 +457,10 @@ function YearlyReport({ trips, expenses, maint }: {
             {[
               { label: "Пътувания", value: `${yTrips.length} бр.`, color: "text-blue-500" },
               { label: "Изминати км", value: `${totalKm.toFixed(0)} км`, color: "text-green-500" },
-              { label: "Гориво", value: `${totalFuel.toFixed(2)} €`, color: "text-orange-500" },
-              { label: "Разходи + Поддръжка", value: `${(totalExp + totalMaint).toFixed(2)} €`, color: "text-red-500" },
+              { label: "Гориво", value: `${totalFuel.toFixed(2)} ${currency}`, color: "text-orange-500" },
+              { label: "Разходи + Поддръжка", value: `${(totalExp + totalMaint).toFixed(2)} ${currency}`, color: "text-red-500" },
             ].map((s, i) => (
-              <div key={i} className="bg-gray-50 dark:bg-white/4 rounded-xl p-3">
+              <div key={i} className="bg-gray-50 dark:bg-[#2c2c30] rounded-xl p-3">
                 <p className="text-[10px] text-gray-400 leading-none">{s.label}</p>
                 <p className={`text-[15px] font-bold tabular-nums mt-1 ${s.color}`}>{s.value}</p>
               </div>
@@ -465,7 +469,7 @@ function YearlyReport({ trips, expenses, maint }: {
 
           <div className="flex items-center justify-between bg-indigo-500/8 dark:bg-indigo-500/15 border border-indigo-500/20 rounded-xl px-4 py-3">
             <span className="text-[13px] font-semibold text-gray-900 dark:text-white">Общо за {year}</span>
-            <span className="text-[18px] font-bold text-indigo-500 tabular-nums">{grand.toFixed(2)} €</span>
+            <span className="text-[18px] font-bold text-indigo-500 tabular-nums">{grand.toFixed(2)} {currency}</span>
           </div>
 
           {/* Month-by-month chart */}
@@ -480,7 +484,7 @@ function YearlyReport({ trips, expenses, maint }: {
                     <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                     <Tooltip formatter={(v: number, name: string) => {
                       const labels: Record<string, string> = { fuel: "Гориво", exp: "Разходи", main: "Поддръжка" };
-                      return [`${v.toFixed(2)} €`, labels[name] ?? name];
+                      return [`${v.toFixed(2)} ${currency}`, labels[name] ?? name];
                     }} contentStyle={{ borderRadius: 8, border: "none", fontSize: 11, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                     <Bar dataKey="fuel" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
                     <Bar dataKey="exp" stackId="a" fill="#f97316" radius={[0, 0, 0, 0]} />
@@ -508,8 +512,8 @@ function YearlyReport({ trips, expenses, maint }: {
                   <div key={cat} className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
                     <span className="text-[12px] text-gray-600 dark:text-gray-400 flex-1">{EXPENSE_BG[cat] ?? cat}</span>
-                    <span className="text-[12px] font-semibold text-gray-900 dark:text-white tabular-nums">{amt.toFixed(2)} €</span>
-                    <div className="w-16 h-1.5 bg-gray-100 dark:bg-white/8 rounded-full overflow-hidden">
+                    <span className="text-[12px] font-semibold text-gray-900 dark:text-white tabular-nums">{amt.toFixed(2)} {currency}</span>
+                    <div className="w-16 h-1.5 bg-gray-100 dark:bg-[#2c2c30] rounded-full overflow-hidden">
                       <div className="h-full rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length], width: `${(amt / totalExp) * 100}%` }} />
                     </div>
                   </div>
@@ -525,8 +529,8 @@ function YearlyReport({ trips, expenses, maint }: {
 
 // ─── Tax Report ───────────────────────────────────────────────────────────────
 
-function TaxReport({ trips, expenses, maint }: {
-  trips: CompletedTrip[]; expenses: Expense[]; maint: MaintenanceItem[];
+function TaxReport({ trips, expenses, maint, currency }: {
+  trips: CompletedTrip[]; expenses: Expense[]; maint: MaintenanceItem[]; currency: string;
 }) {
   const [year, setYear] = useState(new Date().getFullYear());
   const [businessPct, setBusinessPct] = useState(100);
@@ -549,7 +553,7 @@ function TaxReport({ trips, expenses, maint }: {
   const totalDeductible = businessFuelCost + businessExpCost + businessMaintCost;
 
   function handlePrint() {
-    const html = buildPrintHTML(yTrips, yExp, yMaint, `${year} (${businessPct}% бизнес)`);
+    const html = buildPrintHTML(yTrips, yExp, yMaint, `${year} (${businessPct}% бизнес)`, currency);
     openPrintWindow(html);
   }
 
@@ -561,12 +565,12 @@ function TaxReport({ trips, expenses, maint }: {
       `Бизнес дял: ${businessPct}%\n\n` +
       `Общо км: ${totalKm.toFixed(0)} км\n` +
       `Бизнес км: ${businessKm.toFixed(0)} км\n\n` +
-      `Гориво (общо): ${totalFuelCost.toFixed(2)} €\n` +
-      `Гориво (бизнес): ${businessFuelCost.toFixed(2)} €\n\n` +
-      `Разходи (бизнес): ${businessExpCost.toFixed(2)} €\n` +
-      `Поддръжка (бизнес): ${businessMaintCost.toFixed(2)} €\n\n` +
+      `Гориво (общо): ${totalFuelCost.toFixed(2)} ${currency}\n` +
+      `Гориво (бизнес): ${businessFuelCost.toFixed(2)} ${currency}\n\n` +
+      `Разходи (бизнес): ${businessExpCost.toFixed(2)} ${currency}\n` +
+      `Поддръжка (бизнес): ${businessMaintCost.toFixed(2)} ${currency}\n\n` +
       `══════════════════════════\n` +
-      `ПРИСПАДАЕМО ОБЩО: ${totalDeductible.toFixed(2)} €\n`;
+      `ПРИСПАДАЕМО ОБЩО: ${totalDeductible.toFixed(2)} ${currency}\n`;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 3000);
@@ -579,15 +583,15 @@ function TaxReport({ trips, expenses, maint }: {
     { label: "Пътувания", value: `${yTrips.length} бр.`, sub: null },
     { label: "Общо изминати км", value: `${totalKm.toFixed(0)} км`, sub: null },
     { label: `Бизнес км (${businessPct}%)`, value: `${businessKm.toFixed(0)} км`, sub: "Приспадаемо" },
-    { label: "Гориво (общо)", value: `${totalFuelCost.toFixed(2)} €`, sub: null },
-    { label: `Гориво (бизнес ${businessPct}%)`, value: `${businessFuelCost.toFixed(2)} €`, sub: "Приспадаемо" },
-    { label: `Разходи (бизнес ${businessPct}%)`, value: `${businessExpCost.toFixed(2)} €`, sub: "Приспадаемо" },
-    { label: `Поддръжка (бизнес ${businessPct}%)`, value: `${businessMaintCost.toFixed(2)} €`, sub: "Приспадаемо" },
+    { label: "Гориво (общо)", value: `${totalFuelCost.toFixed(2)} ${currency}`, sub: null },
+    { label: `Гориво (бизнес ${businessPct}%)`, value: `${businessFuelCost.toFixed(2)} ${currency}`, sub: "Приспадаемо" },
+    { label: `Разходи (бизнес ${businessPct}%)`, value: `${businessExpCost.toFixed(2)} ${currency}`, sub: "Приспадаемо" },
+    { label: `Поддръжка (бизнес ${businessPct}%)`, value: `${businessMaintCost.toFixed(2)} ${currency}`, sub: "Приспадаемо" },
   ];
 
   return (
     <Card className="overflow-hidden">
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-gray-100 dark:border-white/6">
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-gray-100 dark:border-white/[0.07]">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-orange-500 flex items-center justify-center">
             <Receipt size={15} className="text-white" />
@@ -600,7 +604,7 @@ function TaxReport({ trips, expenses, maint }: {
         <div className="flex gap-1">
           {years.map(y => (
             <button key={y} onClick={() => setYear(y)}
-              className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all ${y === year ? "bg-orange-500 text-white" : "bg-gray-100 dark:bg-white/8 text-gray-500"}`}>
+              className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all ${y === year ? "bg-orange-500 text-white" : "bg-gray-100 dark:bg-[#2c2c30] text-gray-500"}`}>
               {y}
             </button>
           ))}
@@ -626,9 +630,9 @@ function TaxReport({ trips, expenses, maint }: {
         ) : (
           <>
             {/* Data rows */}
-            <div className="bg-gray-50 dark:bg-white/4 rounded-xl overflow-hidden">
+            <div className="bg-gray-50 dark:bg-[#2c2c30] rounded-xl overflow-hidden">
               {rows.map((r, i) => (
-                <div key={i} className={`flex items-center justify-between px-3 py-2.5 ${i < rows.length - 1 ? "border-b border-gray-100 dark:border-white/6" : ""} ${r.sub ? "bg-green-500/4 dark:bg-green-500/8" : ""}`}>
+                <div key={i} className={`flex items-center justify-between px-3 py-2.5 ${i < rows.length - 1 ? "border-b border-gray-100 dark:border-white/[0.07]" : ""} ${r.sub ? "bg-green-500/4 dark:bg-green-500/8" : ""}`}>
                   <div>
                     <p className="text-[13px] text-gray-700 dark:text-gray-300">{r.label}</p>
                     {r.sub && <p className="text-[10px] text-green-600 dark:text-green-500">{r.sub}</p>}
@@ -644,7 +648,7 @@ function TaxReport({ trips, expenses, maint }: {
                 <p className="text-[13px] font-semibold text-gray-900 dark:text-white">Приспадаемо общо</p>
                 <p className="text-[10px] text-gray-400">Гориво + Разходи + Поддръжка × {businessPct}%</p>
               </div>
-              <span className="text-[20px] font-bold text-orange-500 tabular-nums">{totalDeductible.toFixed(2)} €</span>
+              <span className="text-[20px] font-bold text-orange-500 tabular-nums">{totalDeductible.toFixed(2)} {currency}</span>
             </div>
 
             <div className="flex items-start gap-2 bg-blue-500/6 dark:bg-blue-500/12 rounded-xl px-3 py-2.5">
@@ -659,12 +663,549 @@ function TaxReport({ trips, expenses, maint }: {
                 <FileDown size={14} />PDF
               </motion.button>
               <motion.button onClick={handleCopyText} whileTap={{ scale: 0.97 }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all ${copied ? "bg-green-500 text-white" : "bg-gray-100 dark:bg-white/8 text-gray-700 dark:text-gray-300"}`}>
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all ${copied ? "bg-green-500 text-white" : "bg-gray-100 dark:bg-[#2c2c30] text-gray-700 dark:text-gray-300"}`}>
                 {copied ? <><CheckCircle2 size={14} />Копирано!</> : <><Copy size={14} />Копирай текст</>}
               </motion.button>
             </div>
           </>
         )}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Import / Export ──────────────────────────────────────────────────────────
+
+interface ImportData {
+  trips?: CompletedTrip[];
+  expenses?: Expense[];
+  maintenance?: MaintenanceItem[];
+}
+
+function ImportCard({ onImport, trips, expenses, maint }: {
+  onImport: (data: AllBackupData) => void;
+  trips: CompletedTrip[]; expenses: Expense[]; maint: MaintenanceItem[];
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string) as ImportData;
+        onImport(data);
+        setStatus("success");
+        setTimeout(() => setStatus("idle"), 3000);
+      } catch {
+        setStatus("error");
+        setTimeout(() => setStatus("idle"), 3000);
+      }
+    };
+    reader.readAsText(file);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function handleExport() {
+    const data: ImportData = { trips, expenses, maintenance: maint };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `razhood-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  function handleExportCSV() {
+    const rows: string[] = [];
+
+    // Trips sheet
+    rows.push("=== ПЪТУВАНИЯ ===");
+    rows.push("Дата,Начало км,Край км,Разстояние км,Литри,Цена/л,Общо лв,Разход л/100км,Бележка,Гориво");
+    for (const t of trips) {
+      const dist = (t.endKm - t.startKm).toFixed(1);
+      const cons = t.endKm > t.startKm ? ((t.liters / (t.endKm - t.startKm)) * 100).toFixed(2) : "0";
+      const cost = (t.liters * t.pricePerLiter).toFixed(2);
+      const row = [
+        t.endedAt.slice(0, 10),
+        t.startKm, t.endKm, dist,
+        t.liters.toFixed(2),
+        t.pricePerLiter.toFixed(2),
+        cost, cons,
+        `"${(t.note ?? "").replace(/"/g, "'")}"`,
+        t.fuelType ?? "petrol",
+      ].join(",");
+      rows.push(row);
+    }
+
+    rows.push("");
+    rows.push("=== РАЗХОДИ ===");
+    rows.push("Дата,Категория,Сума,Бележка");
+    for (const e of expenses) {
+      const cat: Record<string, string> = { repair:"Ремонт", wash:"Миене", parking:"Паркинг", toll:"Магистрала", fine:"Глоба", other:"Друго" };
+      rows.push([
+        e.date,
+        cat[e.category] ?? e.category,
+        e.amount.toFixed(2),
+        `"${(e.note ?? "").replace(/"/g, "'")}"`,
+      ].join(","));
+    }
+
+    rows.push("");
+    rows.push("=== ПОДДРЪЖКА ===");
+    rows.push("Дата,Тип,Цена,Километри,Бележка");
+    for (const m of maint) {
+      rows.push([
+        m.doneDate,
+        `"${m.type.replace(/"/g, "'")}"`,
+        m.cost.toFixed(2),
+        m.km ?? "",
+        `"${(m.note ?? "").replace(/"/g, "'")}"`,
+      ].join(","));
+    }
+
+    const bom = "\uFEFF"; // UTF-8 BOM за правилно кирилица в Excel
+    const blob = new Blob([bom + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `razhood-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/[0.07]">
+        <div className="w-8 h-8 rounded-xl bg-teal-500 flex items-center justify-center">
+          <Database size={15} className="text-white" />
+        </div>
+        <div>
+          <p className="text-[15px] font-semibold text-gray-900 dark:text-white">Импорт / Експорт</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">Архивирай или възстанови данните</p>
+        </div>
+      </div>
+      <div className="p-4 space-y-2">
+        <motion.button onClick={handleExportCSV} whileTap={{ scale: 0.98 }}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[14px] font-semibold bg-green-500 text-white">
+          <Download size={15} />Изтегли CSV (Excel)
+        </motion.button>
+        <motion.button onClick={handleExport} whileTap={{ scale: 0.98 }}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[14px] font-semibold bg-teal-500 text-white">
+          <Download size={15} />Изтегли архив (JSON)
+        </motion.button>
+        <motion.button onClick={() => fileRef.current?.click()} whileTap={{ scale: 0.98 }}
+          className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[14px] font-semibold transition-all ${
+            status === "success" ? "bg-green-500 text-white" :
+            status === "error" ? "bg-red-500 text-white" :
+            "bg-gray-100 dark:bg-[#2c2c30] text-gray-700 dark:text-gray-300"
+          }`}>
+          <Upload size={15} />
+          {status === "success" ? "Успешно импортиране!" : status === "error" ? "Грешка в JSON файла" : "Импортирай от JSON"}
+        </motion.button>
+        <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
+        <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">Импортът добавя данните към съществуващите</p>
+      </div>
+    </Card>
+  );
+}
+
+// ─── Fines Report ─────────────────────────────────────────────────────────────
+
+function FinesReport({ expenses, currency, onUpdateExpense }: { expenses: Expense[]; currency: string; onUpdateExpense: (e: Expense) => void }) {
+  const fines = expenses.filter(e => e.category === "fine");
+  if (fines.length === 0) return null;
+
+  const unpaid = fines.filter(f => !f.finePaid);
+  const totalUnpaid = unpaid.reduce((s, f) => s + f.amount, 0);
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/[0.07]">
+        <div className="w-8 h-8 rounded-xl bg-red-500 flex items-center justify-center">
+          <AlertTriangle size={15} className="text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-[15px] font-semibold text-gray-900 dark:text-white">Глоби</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">
+            {unpaid.length} неплатени · {totalUnpaid.toFixed(2)} {currency}
+          </p>
+        </div>
+      </div>
+      <div className="divide-y divide-gray-100 dark:divide-white/[0.07]">
+        {fines.sort((a, b) => (a.finePaid ? 1 : -1)).map(fine => {
+          const daysLeft = fine.fineDeadline ? Math.floor((new Date(fine.fineDeadline).getTime() - Date.now()) / 86400000) : null;
+          return (
+            <div key={fine.id} className="flex items-center gap-3 px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-gray-900 dark:text-white">{fine.amount.toFixed(2)} {currency}</p>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">{fine.date}{fine.note ? ` · ${fine.note}` : ""}</p>
+                {fine.fineDeadline && !fine.finePaid && (
+                  <p className={`text-[11px] font-semibold mt-0.5 ${daysLeft !== null && daysLeft < 0 ? "text-red-500" : daysLeft !== null && daysLeft <= 7 ? "text-orange-500" : "text-gray-400"}`}>
+                    {daysLeft !== null && daysLeft < 0 ? `Просрочена с ${Math.abs(daysLeft)} дни` : `Краен срок: ${fine.fineDeadline} (${daysLeft} дни)`}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => onUpdateExpense({ ...fine, finePaid: !fine.finePaid })}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                  fine.finePaid ? "bg-green-500/15 text-green-600 dark:text-green-400" : "bg-red-500/10 text-red-500"
+                }`}>
+                {fine.finePaid ? <><CheckCircle2 size={11} />Платена</> : "Неплатена"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Period Comparison ────────────────────────────────────────────────────────
+
+function PeriodComparison({ trips, expenses, currency }: { trips: CompletedTrip[]; expenses: Expense[]; currency: string }) {
+  const [periodA, setPeriodA] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 1);
+    return d.toISOString().slice(0, 7);
+  });
+  const [periodB, setPeriodB] = useState(() => new Date().toISOString().slice(0, 7));
+
+  function statsForPeriod(period: string) {
+    const t = trips.filter(tr => tr.endedAt.startsWith(period));
+    const e = expenses.filter(ex => ex.date.startsWith(period));
+    const km = t.reduce((s, tr) => s + tripDistance(tr), 0);
+    const fuel = t.reduce((s, tr) => s + tripTotalCost(tr), 0);
+    const expCost = e.reduce((s, ex) => s + ex.amount, 0);
+    const avgCons = t.length > 0 ? t.reduce((s, tr) => s + tripConsumption(tr), 0) / t.length : 0;
+    return { trips: t.length, km, fuel, expCost, avgCons };
+  }
+
+  const a = statsForPeriod(periodA);
+  const b = statsForPeriod(periodB);
+
+  const months = Array.from(new Set([
+    ...trips.map(t => t.endedAt.slice(0, 7)),
+    ...expenses.map(e => e.date.slice(0, 7)),
+  ])).sort().reverse().slice(0, 12);
+
+  if (months.length < 2) return null;
+
+  function monthLabel(m: string) {
+    const [y, mo] = m.split("-");
+    return `${BG_MONTHS[parseInt(mo) - 1]} ${y}`;
+  }
+
+  function DiffBadge({ valA, valB, lowerIsBetter = false }: { valA: number; valB: number; lowerIsBetter?: boolean }) {
+    if (valA === 0 && valB === 0) return null;
+    const diff = valB - valA;
+    const pct = valA > 0 ? Math.abs(diff / valA * 100) : 0;
+    const better = lowerIsBetter ? diff < 0 : diff > 0;
+    if (Math.abs(diff) < 0.01) return <span className="text-[10px] text-gray-400">=</span>;
+    return (
+      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${better ? "bg-green-500/10 text-green-600 dark:text-green-400" : "bg-red-500/10 text-red-500"}`}>
+        {diff > 0 ? "+" : ""}{pct.toFixed(0)}%
+      </span>
+    );
+  }
+
+  const rows: { label: string; valA: number; valB: number; unit: string; lowerIsBetter?: boolean }[] = [
+    { label: "Пътувания", valA: a.trips, valB: b.trips, unit: "" },
+    { label: "Километри", valA: a.km, valB: b.km, unit: "км" },
+    { label: "Гориво", valA: a.fuel, valB: b.fuel, unit: currency, lowerIsBetter: true },
+    { label: "Разходи", valA: a.expCost, valB: b.expCost, unit: currency, lowerIsBetter: true },
+    { label: "Ср. разход", valA: a.avgCons, valB: b.avgCons, unit: "л/100км", lowerIsBetter: true },
+  ];
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/[0.07]">
+        <div className="w-8 h-8 rounded-xl bg-purple-500 flex items-center justify-center">
+          <TrendingUp size={15} className="text-white" />
+        </div>
+        <div>
+          <p className="text-[15px] font-semibold text-gray-900 dark:text-white">Сравнение периоди</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">Сравни два месеца</p>
+        </div>
+      </div>
+      <div className="p-4 space-y-3">
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <p className="text-[11px] text-gray-400 mb-1">Период А</p>
+            <select value={periodA} onChange={e => setPeriodA(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-[#252528] rounded-xl px-3 py-2 text-[13px] text-gray-900 dark:text-white outline-none border border-gray-100 dark:border-white/[0.07]">
+              {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+          </div>
+          <div className="flex items-end pb-2 text-gray-400 font-bold">vs</div>
+          <div className="flex-1">
+            <p className="text-[11px] text-gray-400 mb-1">Период Б</p>
+            <select value={periodB} onChange={e => setPeriodB(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-[#252528] rounded-xl px-3 py-2 text-[13px] text-gray-900 dark:text-white outline-none border border-gray-100 dark:border-white/[0.07]">
+              {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 dark:bg-[#252528] rounded-xl overflow-hidden">
+          <div className="grid grid-cols-4 px-3 py-2 border-b border-gray-100 dark:border-white/[0.07]">
+            <p className="text-[10px] text-gray-400 col-span-1"></p>
+            <p className="text-[10px] font-semibold text-purple-500 text-center">{monthLabel(periodA)}</p>
+            <p className="text-[10px] font-semibold text-blue-500 text-center">{monthLabel(periodB)}</p>
+            <p className="text-[10px] text-gray-400 text-center">Промяна</p>
+          </div>
+          {rows.map((r, i) => (
+            <div key={i} className={`grid grid-cols-4 px-3 py-2.5 items-center ${i < rows.length - 1 ? "border-b border-gray-100 dark:border-white/[0.05]" : ""}`}>
+              <p className="text-[12px] text-gray-600 dark:text-gray-300">{r.label}</p>
+              <p className="text-[12px] font-semibold text-gray-900 dark:text-white tabular-nums text-center">{r.valA > 0 ? r.valA.toFixed(r.unit === "" ? 0 : 1) : "—"}{r.unit ? ` ${r.unit}` : ""}</p>
+              <p className="text-[12px] font-semibold text-gray-900 dark:text-white tabular-nums text-center">{r.valB > 0 ? r.valB.toFixed(r.unit === "" ? 0 : 1) : "—"}{r.unit ? ` ${r.unit}` : ""}</p>
+              <div className="flex justify-center"><DiffBadge valA={r.valA} valB={r.valB} lowerIsBetter={r.lowerIsBetter} /></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── Backup Card ──────────────────────────────────────────────────────────────
+
+interface AllBackupData {
+  version: number;
+  trips: CompletedTrip[];
+  expenses: Expense[];
+  maintenance: MaintenanceItem[];
+  cars?: CarProfile[];
+  carDamages?: CarDamage[];
+  fillUps?: FuelFillUp[];
+  documents?: CarDocument[];
+  checklistItems?: ChecklistItem[];
+  savedLocation?: SavedLocation | null;
+  expiries?: ExpiryDates;
+  recurringExpenses?: RecurringExpense[];
+  currency?: string;
+  activeCarId?: string;
+  activeTrip?: ActiveTrip | null;
+}
+
+function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documents, checklistItems, savedLocation, expiries, recurringExpenses, currency, activeCarId, activeTrip, onRestore }: {
+  trips: CompletedTrip[];
+  expenses: Expense[];
+  maint: MaintenanceItem[];
+  cars: CarProfile[];
+  carDamages: CarDamage[];
+  fillUps: FuelFillUp[];
+  documents: CarDocument[];
+  checklistItems: ChecklistItem[];
+  savedLocation: SavedLocation | null;
+  expiries: ExpiryDates;
+  recurringExpenses: RecurringExpense[];
+  currency: string;
+  activeCarId: string;
+  activeTrip: ActiveTrip | null;
+  onRestore: (data: AllBackupData) => void;
+}) {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  const [backupCode, setBackupCode] = useState<string | null>(null);
+  const [showCode, setShowCode] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [restoreCode, setRestoreCode] = useState("");
+  const [restoreStatus, setRestoreStatus] = useState<"idle" | "ok" | "err">("idle");
+  const [restoreErr, setRestoreErr] = useState("");
+
+  function buildBackupData(): AllBackupData {
+    return {
+      version: 4,
+      trips,
+      expenses,
+      maintenance: maint,
+      cars,
+      carDamages,
+      fillUps,
+      documents,
+      checklistItems,
+      savedLocation,
+      expiries,
+      recurringExpenses,
+      currency,
+      activeCarId,
+      activeTrip,
+    };
+  }
+
+  function generateCode() {
+    const data = buildBackupData();
+    const json = JSON.stringify(data);
+    const code = LZString.compressToEncodedURIComponent(json);
+    setBackupCode(code);
+    setShowCode(true);
+    setShowQr(false);
+  }
+
+  async function generateQR() {
+    const data = buildBackupData();
+    const json = JSON.stringify(data);
+    const code = LZString.compressToEncodedURIComponent(json);
+    // QR code embeds just the code — user scans and pastes into app
+    try {
+      const url = await QRCode.toDataURL(code, { width: 280, margin: 2, color: { dark: "#1e1e22", light: "#ffffff" } });
+      setQrDataUrl(url);
+      setBackupCode(code);
+      setShowQr(true);
+      setShowCode(false);
+    } catch {
+      generateCode(); // fallback to text code
+    }
+  }
+
+  function copyCode() {
+    if (!backupCode) return;
+    navigator.clipboard.writeText(backupCode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  }
+
+  function handleRestore() {
+    const code = restoreCode.trim();
+    if (!code) return;
+    try {
+      const json = LZString.decompressFromEncodedURIComponent(code);
+      if (!json) throw new Error("Невалиден код — не може да се декомпресира");
+      const data = JSON.parse(json) as AllBackupData;
+      // Basic validation — must be a plain object with at least one known field
+      if (typeof data !== "object" || data === null) throw new Error("Невалиден формат");
+      if (!Array.isArray(data.trips) && !Array.isArray(data.cars) && !Array.isArray(data.fillUps))
+        throw new Error("Непознат формат на backup");
+      onRestore(data);
+      setRestoreStatus("ok");
+      setRestoreCode("");
+      setTimeout(() => setRestoreStatus("idle"), 4000);
+    } catch (e) {
+      setRestoreErr(e instanceof Error ? e.message : "Невалиден backup код");
+      setRestoreStatus("err");
+      setTimeout(() => { setRestoreStatus("idle"); setRestoreErr(""); }, 5000);
+    }
+  }
+
+  const totalItems = trips.length + expenses.length + maint.length + cars.length + fillUps.length;
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/[0.07]">
+        <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center">
+          <Shield size={15} className="text-white" />
+        </div>
+        <div>
+          <p className="text-[15px] font-semibold text-gray-900 dark:text-white">Backup & Синхронизация</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">{totalItems} записа · пренеси на друго устройство</p>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {/* Status badge */}
+        {restoreStatus !== "idle" && (
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-semibold ${restoreStatus === "ok" ? "bg-green-500/10 text-green-600 dark:text-green-400" : "bg-red-500/10 text-red-500"}`}>
+            {restoreStatus === "ok" ? <><CheckCircle2 size={14} />Данните са възстановени успешно!</> : <><AlertTriangle size={14} />{restoreErr || "Невалиден backup код"}</>}
+          </motion.div>
+        )}
+
+        {/* ── ИЗПРАТИ (Share) ── */}
+        <div className="bg-indigo-500/8 dark:bg-indigo-500/12 rounded-2xl p-3 space-y-2.5">
+          <p className="text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+            <Database size={13} />Изпрати на друго устройство
+          </p>
+          <div className="flex gap-2">
+            {/* Native share (AirDrop / iMessage / WhatsApp) */}
+            <button onClick={async () => {
+              const data = buildBackupData();
+              const code = LZString.compressToEncodedURIComponent(JSON.stringify(data));
+              if (navigator.share) {
+                try { await navigator.share({ title: "Backup — Разход на гориво", text: code }); } catch { /* dismissed */ }
+              } else {
+                navigator.clipboard.writeText(code);
+                setCopied(true); setTimeout(() => setCopied(false), 2500);
+              }
+            }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-semibold bg-indigo-500 text-white active:scale-95 transition-all">
+              <Link2 size={14} />Сподели
+            </button>
+            <button onClick={generateQR}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-[13px] font-semibold bg-gray-100 dark:bg-[#2c2c30] text-gray-700 dark:text-gray-300 active:scale-95 transition-all">
+              <QrCode size={14} />QR
+            </button>
+            <button onClick={generateCode}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-[13px] font-semibold bg-gray-100 dark:bg-[#2c2c30] text-gray-700 dark:text-gray-300 active:scale-95 transition-all">
+              <Copy size={14} />Код
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-400 dark:text-gray-500">
+            "Сподели" отваря AirDrop / iMessage / WhatsApp. Снимките не се включват.
+          </p>
+        </div>
+
+        {/* ── ПОЛУЧИ (Import) ── */}
+        <div className="bg-green-500/6 dark:bg-green-500/10 rounded-2xl p-3 space-y-2.5">
+          <p className="text-[12px] font-semibold text-green-600 dark:text-green-400 flex items-center gap-1.5">
+            <Download size={13} />Получи от друго устройство
+          </p>
+          <textarea
+            value={restoreCode}
+            onChange={e => setRestoreCode(e.target.value)}
+            rows={3}
+            placeholder="Постни backup кода тук..."
+            className="w-full bg-white dark:bg-[#1e1e22] rounded-xl p-2.5 text-[11px] text-gray-700 dark:text-gray-300 font-mono outline-none border border-gray-200 dark:border-white/[0.07] resize-none placeholder-gray-300 dark:placeholder-gray-600"
+          />
+          <div className="flex gap-2">
+            <button onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText();
+                if (text.trim()) setRestoreCode(text.trim());
+              } catch { /* permission denied */ }
+            }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-semibold bg-gray-100 dark:bg-[#2c2c30] text-gray-600 dark:text-gray-300 active:scale-95 transition-all">
+              <ClipboardPaste size={14} />Постни от клипборд
+            </button>
+            <button onClick={handleRestore} disabled={!restoreCode.trim()}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-semibold bg-green-500 text-white disabled:opacity-40 active:scale-95 transition-all">
+              <Download size={14} />Възстанови
+            </button>
+          </div>
+        </div>
+
+        {/* QR Code display */}
+        <AnimatePresence>
+          {showQr && qrDataUrl && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+              <div className="bg-white rounded-2xl p-4 flex flex-col items-center gap-3">
+                <img src={qrDataUrl} alt="Backup QR" className="w-56 h-56 rounded-xl" />
+                <p className="text-[11px] text-gray-500 text-center">Сканирай с другото устройство → "Постни от клипборд"</p>
+                <button onClick={copyCode}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all ${copied ? "bg-green-500 text-white" : "bg-indigo-500 text-white"}`}>
+                  {copied ? <><CheckCircle2 size={13} />Копирано!</> : <><Copy size={13} />Копирай кода</>}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Text code display */}
+        <AnimatePresence>
+          {showCode && backupCode && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+              <div className="bg-gray-50 dark:bg-[#252528] rounded-xl p-3 space-y-2">
+                <textarea readOnly value={backupCode} rows={3}
+                  className="w-full bg-white dark:bg-[#1e1e22] rounded-lg p-2 text-[10px] text-gray-500 dark:text-gray-400 font-mono outline-none border border-gray-200 dark:border-white/[0.07] resize-none" />
+                <button onClick={copyCode}
+                  className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[13px] font-semibold transition-all ${copied ? "bg-green-500 text-white" : "bg-indigo-500 text-white"}`}>
+                  {copied ? <><CheckCircle2 size={13} />Копирано!</> : <><Copy size={13} />Копирай</>}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <p className="text-[10px] text-orange-500/80 text-center">⚠️ Данните ще се добавят към съществуващите</p>
       </div>
     </Card>
   );
@@ -676,15 +1217,55 @@ interface ReportsProps {
   tripHistory: CompletedTrip[];
   expenses: Expense[];
   maintenanceItems: MaintenanceItem[];
+  currency: string;
+  activeCarId: string;
+  activeTrip: ActiveTrip | null;
+  onUpdateExpense: (e: Expense) => void;
+  onImport: (data: AllBackupData) => void;
+  cars: CarProfile[];
+  carDamages: CarDamage[];
+  fillUps: FuelFillUp[];
+  documents: CarDocument[];
+  checklistItems: ChecklistItem[];
+  savedLocation: SavedLocation | null;
+  expiries: ExpiryDates;
+  recurringExpenses: RecurringExpense[];
 }
 
-export default function Reports({ tripHistory, expenses, maintenanceItems }: ReportsProps) {
+export default function Reports({ tripHistory, expenses, maintenanceItems, currency, activeCarId, activeTrip, onUpdateExpense, onImport, cars, carDamages, fillUps, documents, checklistItems, savedLocation, expiries, recurringExpenses }: ReportsProps) {
+  const currentYear = new Date().getFullYear();
   return (
     <div className="space-y-4 px-4 pb-8 pt-2">
-      <QuickActions trips={tripHistory} expenses={expenses} maint={maintenanceItems} />
-      <MonthlyReport trips={tripHistory} expenses={expenses} maint={maintenanceItems} />
-      <YearlyReport trips={tripHistory} expenses={expenses} maint={maintenanceItems} />
-      <TaxReport trips={tripHistory} expenses={expenses} maint={maintenanceItems} />
+      <MonthlyReport trips={tripHistory} expenses={expenses} maint={maintenanceItems} currency={currency} />
+      <YearlyReport trips={tripHistory} expenses={expenses} maint={maintenanceItems} currency={currency} />
+      <TaxReport trips={tripHistory} expenses={expenses} maint={maintenanceItems} currency={currency} />
+      <PeriodComparison trips={tripHistory} expenses={expenses} currency={currency} />
+      <FinesReport expenses={expenses} currency={currency} onUpdateExpense={onUpdateExpense} />
+      <QuickActions trips={tripHistory} expenses={expenses} maint={maintenanceItems} currency={currency} />
+      <BackupCard
+        trips={tripHistory} expenses={expenses} maint={maintenanceItems}
+        cars={cars} carDamages={carDamages} fillUps={fillUps} documents={documents}
+        checklistItems={checklistItems} savedLocation={savedLocation}
+        expiries={expiries} recurringExpenses={recurringExpenses}
+        currency={currency} activeCarId={activeCarId} activeTrip={activeTrip}
+        onRestore={onImport}
+      />
+      <ImportCard onImport={onImport} trips={tripHistory} expenses={expenses} maint={maintenanceItems} />
+
+      {/* ─── Wrapped Section ─────────────────────────────────────────── */}
+      <div className="rounded-3xl overflow-hidden" style={{ background: "linear-gradient(160deg, #0f0c29 0%, #302b63 50%, #24243e 100%)" }}>
+        <div className="px-5 pt-5 pb-2 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest"
+              style={{ background: "linear-gradient(90deg, #f97316, #ec4899, #6366f1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Разход на гориво
+            </p>
+            <p className="text-[22px] font-extrabold text-white mt-0.5">Wrapped {currentYear}</p>
+          </div>
+          <div className="text-[36px] leading-none">🏆</div>
+        </div>
+        <Wrapped tripHistory={tripHistory} expenses={expenses} currency={currency} />
+      </div>
     </div>
   );
 }
