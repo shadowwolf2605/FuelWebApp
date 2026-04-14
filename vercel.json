@@ -1,0 +1,6 @@
+{
+  "rootDirectory": "artifacts/fuel-calculator",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install --legacy-peer-deps"
+}
