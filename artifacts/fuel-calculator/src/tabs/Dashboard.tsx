@@ -409,12 +409,15 @@ function CurrentTripCard({ trip, onEnd, currency }: { trip: ActiveTrip; onEnd: (
   const photoRef = useRef<HTMLInputElement>(null);
   useEffect(() => { const id = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(id); }, []);
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setPhoto(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setPhoto(compressed);
+    } catch {
+      alert("Грешка при зареждане на снимката. Опитай отново.");
+    }
   }
 
   function startVoice() {
@@ -823,7 +826,7 @@ function HistoryRow({ trip, onDelete, currency, allTrips }: { trip: CompletedTri
   const [shared, setShared] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
-  const similar = allTrips.filter(t => t.id !== trip.id && tripDistance(t) > 5 && Math.abs(tripDistance(t) - dist) / dist <= 0.2);
+  const similar = dist > 0 ? allTrips.filter(t => t.id !== trip.id && tripDistance(t) > 5 && Math.abs(tripDistance(t) - dist) / dist <= 0.2) : [];
 
   function shareTrip() {
     const fuelLabel = trip.fuelType ? ` (${FUEL_TYPE_LABELS[trip.fuelType]})` : "";

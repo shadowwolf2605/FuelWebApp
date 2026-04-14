@@ -758,9 +758,9 @@ function ImportCard({ onImport, trips, expenses, maint }: {
     for (const m of maint) {
       rows.push([
         m.doneDate,
-        `"${m.type.replace(/"/g, "'")}"`,
+        `"${(m.category ?? "").replace(/"/g, "'")}"`,
         m.cost.toFixed(2),
-        m.km ?? "",
+        m.mileage ?? "",
         `"${(m.note ?? "").replace(/"/g, "'")}"`,
       ].join(","));
     }

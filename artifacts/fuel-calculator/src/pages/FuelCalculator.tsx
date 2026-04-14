@@ -319,6 +319,15 @@ export default function FuelCalculator() {
     async function checkNotifications() {
       if (!("Notification" in window)) return;
       let permission = Notification.permission;
+      // Deduplicate: track which notifications were already shown today
+      const shownKey = `fa_notif_shown_${new Date().toISOString().slice(0, 10)}_${effectiveCarId}`;
+      const alreadyShown = new Set<string>(JSON.parse(sessionStorage.getItem(shownKey) ?? "[]"));
+      function sendOnce(id: string, title: string, body: string) {
+        if (alreadyShown.has(id)) return;
+        alreadyShown.add(id);
+        sessionStorage.setItem(shownKey, JSON.stringify([...alreadyShown]));
+        new Notification(title, { body, icon: "/icon.svg" });
+      }
       if (permission === "default") {
         permission = await Notification.requestPermission();
       }
@@ -336,15 +345,9 @@ export default function FuelCalculator() {
         if (!item.date) continue;
         const days = Math.floor((new Date(item.date).getTime() - today) / (1000 * 60 * 60 * 24));
         if (days < 0) {
-          new Notification("🚨 Изтекъл документ", {
-            body: `${item.label} е изтекл(а) преди ${Math.abs(days)} дни!`,
-            icon: "/icon.svg",
-          });
+          sendOnce(`doc_expired_${item.label}`, "🚨 Изтекъл документ", `${item.label} е изтекл(а) преди ${Math.abs(days)} дни!`);
         } else if (days <= 30) {
-          new Notification("⚠️ Изтичащ документ", {
-            body: `${item.label} изтича след ${days} дни (${item.date})`,
-            icon: "/icon.svg",
-          });
+          sendOnce(`doc_expiring_${item.label}`, "⚠️ Изтичащ документ", `${item.label} изтича след ${days} дни (${item.date})`);
         }
       }
 
@@ -353,10 +356,7 @@ export default function FuelCalculator() {
         if (expense.category === "fine" && !expense.finePaid && expense.fineDeadline) {
           const days = Math.floor((new Date(expense.fineDeadline).getTime() - today) / (1000 * 60 * 60 * 24));
           if (days >= 0 && days <= 3) {
-            new Notification("⚠️ Краен срок за глоба", {
-              body: `Имаш неплатена глоба от ${expense.amount} ${currency} — краен срок след ${days} дни!`,
-              icon: "/icon.svg",
-            });
+            sendOnce(`fine_${expense.id}`, "⚠️ Краен срок за глоба", `Имаш неплатена глоба от ${expense.amount} ${currency} — краен срок след ${days} дни!`);
           }
         }
       }
@@ -365,10 +365,7 @@ export default function FuelCalculator() {
       for (const r of carRecurringExpenses) {
         const days = Math.floor((new Date(r.nextDueDate).getTime() - today) / (1000 * 60 * 60 * 24));
         if (days >= 0 && days <= 7) {
-          new Notification("📅 Предстоящ разход", {
-            body: `${r.label} — ${r.amount} лв се дължи след ${days} дни`,
-            icon: "/icon.svg",
-          });
+          sendOnce(`rec_${r.id}`, "📅 Предстоящ разход", `${r.label} — ${r.amount} ${currency} се дължи след ${days} дни`);
         }
       }
     }
