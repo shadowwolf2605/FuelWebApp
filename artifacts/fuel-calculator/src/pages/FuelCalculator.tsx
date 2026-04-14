@@ -227,7 +227,7 @@ export default function FuelCalculator() {
   const carFillUps           = effectiveCarId ? fillUps.filter(f => f.carId === effectiveCarId) : fillUps;
 
   // ── Unassigned data migration ───────────────────────────────────────────────
-  const [migrationDismissed, setMigrationDismissed] = useState(false);
+  const [migrationDismissed, setMigrationDismissed] = useLocalStorage("fa_migration_dismissed", false);
   const unassignedCount = effectiveCarId ? (
     tripHistory.filter(t => !t.carId).length +
     expenses.filter(e => !e.carId).length +
@@ -316,9 +316,6 @@ export default function FuelCalculator() {
   }
 
   useEffect(() => {
-    if (notifCheckedRef.current) return;
-    notifCheckedRef.current = true;
-
     async function checkNotifications() {
       if (!("Notification" in window)) return;
       let permission = Notification.permission;
@@ -376,12 +373,12 @@ export default function FuelCalculator() {
       }
     }
     checkNotifications();
-  }, [expiries, expenses, recurringExpenses]);
+  }, [carExpiries, carExpenses, carRecurringExpenses, effectiveCarId]);
 
   useEffect(() => {
-    if (tripHistory.length === 0) return;
-    const totalKm = tripHistory.reduce((s, t) => s + (t.endKm - t.startKm), 0);
-    const totalTrips = tripHistory.length;
+    if (carTripHistory.length === 0) return;
+    const totalKm = carTripHistory.reduce((s, t) => s + (t.endKm - t.startKm), 0);
+    const totalTrips = carTripHistory.length;
     for (const ach of ACHIEVEMENTS) {
       if (!seenAchievements.includes(ach.id) && ach.check(totalKm, totalTrips)) {
         setSeenAchievements(prev => [...prev, ach.id]);
@@ -389,7 +386,7 @@ export default function FuelCalculator() {
         break;
       }
     }
-  }, [tripHistory]);
+  }, [carTripHistory]);
 
   const tabContent: Record<Tab, React.ReactNode> = {
     dashboard: (
@@ -444,21 +441,21 @@ export default function FuelCalculator() {
     ),
     reports: (
       <Reports
-        tripHistory={tripHistory}
-        expenses={expenses}
-        maintenanceItems={maintItems}
+        tripHistory={carTripHistory}
+        expenses={carExpenses}
+        maintenanceItems={carMaintItems}
         currency={currency}
         activeCarId={activeCarId}
         activeTrip={activeTrip}
         onUpdateExpense={updateExpense}
         cars={cars}
-        carDamages={carDamages}
-        fillUps={fillUps}
-        documents={documents}
+        carDamages={carDamageItems}
+        fillUps={carFillUps}
+        documents={carDocuments}
         checklistItems={checklistItems}
         savedLocation={savedLocation}
         expiries={carExpiries}
-        recurringExpenses={recurringExpenses}
+        recurringExpenses={carRecurringExpenses}
         onImport={(data) => {
           if (data.trips?.length) setTripHistory(h => {
             const map = new Map(h.map(t => [t.id, t]));
@@ -535,7 +532,7 @@ export default function FuelCalculator() {
     }
 
     // Unpaid fines with deadline soon
-    for (const e of expenses) {
+    for (const e of carExpenses) {
       if (e.category === "fine" && !e.finePaid && e.fineDeadline) {
         const fineMs = new Date(e.fineDeadline).getTime();
         if (isNaN(fineMs)) continue;
@@ -546,7 +543,7 @@ export default function FuelCalculator() {
     }
 
     // Recurring expenses due soon
-    for (const r of recurringExpenses) {
+    for (const r of carRecurringExpenses) {
       const recMs = new Date(r.nextDueDate).getTime();
       if (isNaN(recMs)) continue;
       const days = Math.floor((recMs - today) / 86400000);
