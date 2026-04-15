@@ -275,7 +275,12 @@ export default function FuelCalculator() {
   }
   function deleteTrip(id: string)          { setTripHistory((h) => h.filter((t) => t.id !== id)); }
   function updateTripPhoto(id: string, photo: string) { setTripHistory((h) => h.map((t) => t.id === id ? { ...t, photo: photo || undefined } : t)); }
-  function updateTripDate(id: string, iso: string)   { setTripHistory((h) => h.map((t) => t.id === id ? { ...t, endedAt: iso } : t)); }
+  function updateTripDate(id: string, iso: string) {
+    setTripHistory((h) => h.map((t) => t.id === id ? { ...t, endedAt: iso } : t));
+    // Keep the auto-created fill-up's date in sync with the trip date
+    const fillUpId = `trip_${id}`;
+    setFillUps((fs) => fs.map((f) => f.id === fillUpId ? { ...f, date: iso.slice(0, 10) } : f));
+  }
   function addMaintItem(item: MaintenanceItem) { setMaintItems((m) => [{ ...item, carId: effectiveCarId || undefined }, ...m]); }
   function deleteMaintItem(id: string)     { setMaintItems((m) => m.filter((i) => i.id !== id)); }
   function addDocument(doc: CarDocument)   { setDocuments((d) => [{ ...doc, carId: effectiveCarId || undefined }, ...d]); }
@@ -459,49 +464,20 @@ export default function FuelCalculator() {
         expiries={carExpiries}
         recurringExpenses={carRecurringExpenses}
         onImport={(data) => {
-          if (data.trips?.length) setTripHistory(h => {
-            const map = new Map(h.map(t => [t.id, t]));
-            data.trips!.forEach(t => map.set(t.id, { ...map.get(t.id), ...t }));
-            return Array.from(map.values());
-          });
-          if (data.expenses?.length) setExpenses(ex => {
-            const map = new Map(ex.map(e => [e.id, e]));
-            data.expenses!.forEach(e => map.set(e.id, { ...map.get(e.id), ...e }));
-            return Array.from(map.values());
-          });
-          if (data.maintenance?.length) setMaintItems(m => {
-            const map = new Map(m.map(i => [i.id, i]));
-            data.maintenance!.forEach(i => map.set(i.id, { ...map.get(i.id), ...i }));
-            return Array.from(map.values());
-          });
-          if (data.cars?.length) setCars(cs => {
-            const map = new Map(cs.map(c => [c.id, c]));
-            data.cars!.forEach(c => map.set(c.id, { ...map.get(c.id), ...c }));
-            return Array.from(map.values());
-          });
-          if (data.carDamages?.length) setCarDamages(ds => {
-            const map = new Map(ds.map(d => [d.id, d]));
-            data.carDamages!.forEach(d => map.set(d.id, { ...map.get(d.id), ...d }));
-            return Array.from(map.values());
-          });
-          if (data.fillUps?.length) setFillUps(fs => {
-            const map = new Map(fs.map(f => [f.id, f]));
-            data.fillUps!.forEach(f => map.set(f.id, { ...map.get(f.id), ...f }));
-            return Array.from(map.values());
-          });
-          if (data.documents?.length) setDocuments(ds => {
-            const map = new Map(ds.map(d => [d.id, d]));
-            data.documents!.forEach(d => map.set(d.id, { ...map.get(d.id), ...d }));
-            return Array.from(map.values());
-          });
-          if (data.recurringExpenses?.length) setRecurringExpenses(rs => {
-            const existing = new Set(rs.map(r => r.id));
-            return [...rs, ...data.recurringExpenses!.filter(r => !existing.has(r.id))];
-          });
-          if (data.checklistItems?.length) setChecklistItems(data.checklistItems!);
+          // Replace arrays entirely — merging by ID causes duplicates when the same
+          // record was created on a different device and therefore has a different ID.
+          if (data.trips?.length)            setTripHistory(data.trips);
+          if (data.expenses?.length)         setExpenses(data.expenses);
+          if (data.maintenance?.length)      setMaintItems(data.maintenance);
+          if (data.cars?.length)             setCars(data.cars);
+          if (data.carDamages?.length)       setCarDamages(data.carDamages);
+          if (data.fillUps?.length)          setFillUps(data.fillUps);
+          if (data.documents?.length)        setDocuments(data.documents);
+          if (data.recurringExpenses?.length) setRecurringExpenses(data.recurringExpenses);
+          if (data.checklistItems?.length)   setChecklistItems(data.checklistItems!);
           if (data.savedLocation !== undefined) setSavedLocation(data.savedLocation ?? null);
-          if (data.expiries) setExpiries(data.expiries);
-          if (data.currency) setCurrency(data.currency);
+          if (data.expiries)    setExpiries(data.expiries);
+          if (data.currency)    setCurrency(data.currency);
           if (data.activeCarId) setActiveCarId(data.activeCarId);
           if (data.activeTrip !== undefined) setActiveTrip(data.activeTrip ?? null);
         }}
