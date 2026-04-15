@@ -1010,6 +1010,7 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
   const [backupCode, setBackupCode] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [withPhotos, setWithPhotos] = useState(false);
   const [restoreCode, setRestoreCode] = useState("");
   const [restoreStatus, setRestoreStatus] = useState<"idle" | "ok" | "err">("idle");
   const [restoreErr, setRestoreErr] = useState("");
@@ -1049,7 +1050,7 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
   }
 
   function generateCode() {
-    const data = buildBackupDataNoPhotos();
+    const data = withPhotos ? buildBackupData() : buildBackupDataNoPhotos();
     const json = JSON.stringify(data);
     const code = LZString.compressToEncodedURIComponent(json);
     setBackupCode(code);
@@ -1058,7 +1059,7 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
   }
 
   async function generateQR() {
-    const data = buildBackupDataNoPhotos();
+    const data = withPhotos ? buildBackupData() : buildBackupDataNoPhotos();
     const json = JSON.stringify(data);
     const code = LZString.compressToEncodedURIComponent(json);
     // QR code embeds just the code — user scans and pastes into app
@@ -1140,10 +1141,27 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
           <p className="text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
             <Database size={13} />Изпрати на друго устройство
           </p>
+          {/* Photos toggle */}
+          <button
+            onClick={() => { setWithPhotos(v => !v); setBackupCode(null); setShowCode(false); setShowQr(false); }}
+            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-white dark:bg-[#1e1e22] border border-gray-200 dark:border-white/[0.08] active:scale-95 transition-all"
+          >
+            <div className="text-left">
+              <p className="text-[13px] font-semibold text-gray-900 dark:text-white">
+                {withPhotos ? "Включи снимките" : "Само данните"}
+              </p>
+              <p className="text-[11px] text-gray-400">
+                {withPhotos ? "Кодът е по-дълъг, но снимките се прехвърлят" : "Кратък код — снимките остават на устройството"}
+              </p>
+            </div>
+            <div className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 flex items-center px-0.5 ${withPhotos ? "bg-indigo-500" : "bg-gray-200 dark:bg-gray-700"}`}>
+              <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${withPhotos ? "translate-x-5" : "translate-x-0"}`} />
+            </div>
+          </button>
           <div className="flex gap-2">
             {/* Native share (AirDrop / iMessage / WhatsApp) */}
             <button onClick={async () => {
-              const data = buildBackupData();
+              const data = withPhotos ? buildBackupData() : buildBackupDataNoPhotos();
               const code = LZString.compressToEncodedURIComponent(JSON.stringify(data));
               if (navigator.share) {
                 try { await navigator.share({ title: "Backup — Разход на гориво", text: code }); } catch { /* dismissed */ }
