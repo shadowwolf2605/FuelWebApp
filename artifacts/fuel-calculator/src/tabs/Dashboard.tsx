@@ -828,6 +828,10 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
   const [showCompare, setShowCompare] = useState(false);
   const [editingDate, setEditingDate] = useState(false);
   const [dateValue, setDateValue] = useState(() => new Date(trip.endedAt).toISOString().slice(0, 10));
+  const [timeValue, setTimeValue] = useState(() => {
+    const d = new Date(trip.endedAt);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  });
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -839,10 +843,12 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
 
   function saveDate() {
     if (!dateValue) return;
-    const existing = new Date(trip.endedAt);
     const [y, m, d] = dateValue.split("-").map(Number);
-    existing.setFullYear(y, m - 1, d);
-    onUpdateDate(existing.toISOString());
+    const [h, min] = (timeValue || "00:00").split(":").map(Number);
+    const updated = new Date(trip.endedAt);
+    updated.setFullYear(y, m - 1, d);
+    updated.setHours(h, min, 0, 0);
+    onUpdateDate(updated.toISOString());
     setEditingDate(false);
   }
   const similar = dist > 0 ? allTrips.filter(t => t.id !== trip.id && tripDistance(t) > 5 && Math.abs(tripDistance(t) - dist) / dist <= 0.2) : [];
@@ -865,11 +871,17 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
             <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 mb-0.5">
               <Calendar size={11} />
               {editingDate ? (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-wrap">
                   <input
                     type="date"
                     value={dateValue}
                     onChange={e => setDateValue(e.target.value)}
+                    className="text-[11px] bg-gray-100 dark:bg-[#2c2c30] text-gray-900 dark:text-white rounded-lg px-2 py-0.5 border-0 outline-none"
+                  />
+                  <input
+                    type="time"
+                    value={timeValue}
+                    onChange={e => setTimeValue(e.target.value)}
                     className="text-[11px] bg-gray-100 dark:bg-[#2c2c30] text-gray-900 dark:text-white rounded-lg px-2 py-0.5 border-0 outline-none"
                   />
                   <button onClick={saveDate} className="text-[11px] font-semibold text-green-500 hover:text-green-600 px-1">✓</button>
