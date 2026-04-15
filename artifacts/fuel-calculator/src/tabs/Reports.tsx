@@ -1027,7 +1027,8 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
   function buildBackupData(): AllBackupData {
     return {
       version: 4,
-      trips,
+      // Strip GPS route points even when photos are included — they're large and not needed for restore
+      trips:      trips.map(({ routePoints: _r, ...t }) => t as typeof trips[0]),
       expenses,
       maintenance: maint,
       cars,
@@ -1040,21 +1041,42 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
       recurringExpenses,
       currency,
       activeCarId,
-      activeTrip,
+      activeTrip: activeTrip ? { ...activeTrip, routePoints: undefined } : activeTrip,
     };
   }
 
-  // Strips all base64 photos — makes the code 10-20x shorter
+  // Removes null / undefined / empty-string / empty-array fields to shrink JSON
+  function compact<T extends object>(obj: T): T {
+    return Object.fromEntries(
+      Object.entries(obj).filter(([, v]) =>
+        v !== null && v !== undefined && v !== "" &&
+        !(Array.isArray(v) && v.length === 0)
+      )
+    ) as T;
+  }
+
+  // Strips photos, GPS route points, and empty fields — makes the code much shorter
   function buildBackupDataNoPhotos(): AllBackupData {
-    const d = buildBackupData();
     return {
-      ...d,
-      trips:      d.trips?.map(({ photo: _p, ...t }) => t as typeof trips[0]) ?? [],
-      expenses:   d.expenses?.map(({ photo: _p, ...e }) => e as typeof expenses[0]) ?? [],
-      fillUps:    d.fillUps?.map(({ photo: _p, ...f }) => f as typeof fillUps[0]) ?? [],
-      cars:       d.cars?.map(({ photo: _p, ...c }) => c as typeof cars[0]) ?? [],
-      carDamages: d.carDamages?.map(({ photo: _p, ...x }) => x as typeof carDamages[0]) ?? [],
-      documents:  d.documents?.map(doc => ({ ...doc, dataUrl: "" })) ?? [],
+      version: 4,
+      // routePoints = GPS trace arrays that can have hundreds of coordinates per trip
+      trips:      trips.map(({ photo: _p, routePoints: _r, ...t }) => compact(t as object) as typeof trips[0]),
+      expenses:   expenses.map(({ photo: _p, ...e }) => compact(e as object) as typeof expenses[0]),
+      fillUps:    fillUps.map(({ photo: _p, ...f }) => compact(f as object) as typeof fillUps[0]),
+      cars:       cars.map(({ photo: _p, ...c }) => compact(c as object) as typeof cars[0]),
+      carDamages: carDamages.map(({ photo: _p, ...x }) => compact(x as object) as typeof carDamages[0]),
+      documents:  documents.map(doc => compact({ ...doc, dataUrl: "" }) as typeof documents[0]),
+      maintenance: maint.map(m => compact(m as object) as typeof maint[0]),
+      checklistItems,
+      savedLocation,
+      expiries,
+      recurringExpenses: recurringExpenses.map(r => compact(r as object) as typeof recurringExpenses[0]),
+      currency,
+      activeCarId,
+      // Strip GPS trace and receipt photo from active trip too
+      activeTrip: activeTrip
+        ? compact({ ...activeTrip, routePoints: undefined, receiptPhoto: undefined } as object) as typeof activeTrip
+        : null,
     };
   }
 
