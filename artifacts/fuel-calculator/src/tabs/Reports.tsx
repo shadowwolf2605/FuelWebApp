@@ -863,12 +863,21 @@ function FinesReport({ expenses, currency, onUpdateExpense }: { expenses: Expens
 
 // ─── Period Comparison ────────────────────────────────────────────────────────
 
+function thisMonthKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function lastMonthKey() {
+  const d = new Date(); d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function PeriodComparison({ trips, expenses, currency }: { trips: CompletedTrip[]; expenses: Expense[]; currency: string }) {
-  const [periodA, setPeriodA] = useState(() => {
-    const d = new Date(); d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0, 7);
-  });
-  const [periodB, setPeriodB] = useState(() => new Date().toISOString().slice(0, 7));
+  // null = user hasn't picked → always default to current/last month (never stale)
+  const [periodAOverride, setPeriodAOverride] = useState<string | null>(null);
+  const [periodBOverride, setPeriodBOverride] = useState<string | null>(null);
+  const periodA = periodAOverride ?? lastMonthKey();
+  const periodB = periodBOverride ?? thisMonthKey();
 
   function statsForPeriod(period: string) {
     const t = trips.filter(tr => tr.endedAt && typeof tr.endedAt === "string" && tr.endedAt.startsWith(period));
@@ -931,7 +940,7 @@ function PeriodComparison({ trips, expenses, currency }: { trips: CompletedTrip[
         <div className="flex gap-2">
           <div className="flex-1">
             <p className="text-[11px] text-gray-400 mb-1">Период А</p>
-            <select value={periodA} onChange={e => setPeriodA(e.target.value)}
+            <select value={periodA} onChange={e => setPeriodAOverride(e.target.value)}
               className="w-full bg-gray-50 dark:bg-[#252528] rounded-xl px-3 py-2 text-[13px] text-gray-900 dark:text-white outline-none border border-gray-100 dark:border-white/[0.07]">
               {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
@@ -939,7 +948,7 @@ function PeriodComparison({ trips, expenses, currency }: { trips: CompletedTrip[
           <div className="flex items-end pb-2 text-gray-400 font-bold">vs</div>
           <div className="flex-1">
             <p className="text-[11px] text-gray-400 mb-1">Период Б</p>
-            <select value={periodB} onChange={e => setPeriodB(e.target.value)}
+            <select value={periodB} onChange={e => setPeriodBOverride(e.target.value)}
               className="w-full bg-gray-50 dark:bg-[#252528] rounded-xl px-3 py-2 text-[13px] text-gray-900 dark:text-white outline-none border border-gray-100 dark:border-white/[0.07]">
               {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
