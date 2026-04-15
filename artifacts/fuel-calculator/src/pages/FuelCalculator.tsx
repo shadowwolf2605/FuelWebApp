@@ -291,9 +291,17 @@ export default function FuelCalculator() {
     const entry = deletedItems.find(d => d.id === trashId);
     if (!entry) return;
     switch (entry.type) {
-      case "trip":
-        setTripHistory(h => [entry.item as CompletedTrip, ...h]);
+      case "trip": {
+        const trip = entry.item as CompletedTrip;
+        setTripHistory(h => [trip, ...h]);
+        // Re-create the auto-generated fill-up that was removed when the trip was deleted
+        const fillUpId = `trip_${trip.id}`;
+        setFillUps(fs => {
+          if (fs.some(f => f.id === fillUpId)) return fs;
+          return [{ id: fillUpId, date: (trip.endedAt ?? trip.startedAt).slice(0, 10), liters: trip.liters, pricePerLiter: trip.pricePerLiter, photo: trip.photo, carId: trip.carId }, ...fs];
+        });
         break;
+      }
       case "document":
         setDocuments(d => [entry.item as CarDocument, ...d]);
         break;
@@ -311,6 +319,30 @@ export default function FuelCalculator() {
         break;
     }
     setDeletedItems(d => d.filter(x => x.id !== trashId));
+  }
+
+  function restoreAllDeletedItems() {
+    const trips = deletedItems.filter(e => e.type === "trip").map(e => e.item as CompletedTrip);
+    const docs = deletedItems.filter(e => e.type === "document").map(e => e.item as CarDocument);
+    const maints = deletedItems.filter(e => e.type === "maintenance").map(e => e.item as MaintenanceItem);
+    const exps = deletedItems.filter(e => e.type === "expense").map(e => e.item as Expense);
+    const damages = deletedItems.filter(e => e.type === "carDamage").map(e => e.item as CarDamage);
+    const fillUpsToRestore = deletedItems.filter(e => e.type === "fillUp").map(e => e.item as FuelFillUp);
+    // Also re-create the auto-generated fill-ups for restored trips
+    const tripFillUps: FuelFillUp[] = trips.map(t => ({ id: `trip_${t.id}`, date: (t.endedAt ?? t.startedAt).slice(0, 10), liters: t.liters, pricePerLiter: t.pricePerLiter, photo: t.photo, carId: t.carId }));
+    if (trips.length) setTripHistory(h => [...trips, ...h]);
+    if (docs.length) setDocuments(d => [...docs, ...d]);
+    if (maints.length) setMaintItems(m => [...maints, ...m]);
+    if (exps.length) setExpenses(ex => [...exps, ...ex]);
+    if (damages.length) setCarDamages(ds => [...damages, ...ds]);
+    if (fillUpsToRestore.length || tripFillUps.length) {
+      const allFillUps = [...fillUpsToRestore, ...tripFillUps];
+      setFillUps(fs => {
+        const existingIds = new Set(fs.map(f => f.id));
+        return [...allFillUps.filter(f => !existingIds.has(f.id)), ...fs];
+      });
+    }
+    setDeletedItems([]);
   }
 
   function clearTrash() {
@@ -564,6 +596,7 @@ export default function FuelCalculator() {
         recurringExpenses={carRecurringExpenses}
         deletedItems={deletedItems}
         onRestoreItem={restoreDeletedItem}
+        onRestoreAll={restoreAllDeletedItems}
         onClearTrash={clearTrash}
         onImport={(data) => {
           // Replace arrays entirely — merging by ID causes duplicates when the same

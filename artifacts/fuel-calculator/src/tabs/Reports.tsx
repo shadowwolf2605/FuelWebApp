@@ -1353,12 +1353,14 @@ function getItemDate(entry: DeletedItem): string {
 interface TrashCardProps {
   deletedItems: DeletedItem[];
   onRestoreItem: (trashId: string) => void;
+  onRestoreAll: () => void;
   onClearTrash: () => void;
   currency: string;
 }
 
-function TrashCard({ deletedItems, onRestoreItem, onClearTrash, currency }: TrashCardProps) {
+function TrashCard({ deletedItems, onRestoreItem, onRestoreAll, onClearTrash, currency }: TrashCardProps) {
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmRestoreAll, setConfirmRestoreAll] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const visibleItems = expanded ? deletedItems : deletedItems.slice(0, 5);
@@ -1375,13 +1377,37 @@ function TrashCard({ deletedItems, onRestoreItem, onClearTrash, currency }: Tras
             {deletedItems.length === 0 ? "Кошчето е празно" : `${deletedItems.length} запис${deletedItems.length === 1 ? "" : "а"} — натисни за възстановяване`}
           </p>
         </div>
-        {deletedItems.length > 0 && !confirmClear && (
-          <button
-            onClick={() => setConfirmClear(true)}
-            className="text-[11px] text-red-400 font-semibold px-2.5 py-1.5 rounded-lg bg-red-500/10 active:scale-95 transition-all"
-          >
-            Изчисти
-          </button>
+        {deletedItems.length > 0 && !confirmClear && !confirmRestoreAll && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setConfirmRestoreAll(true)}
+              className="text-[11px] text-green-600 dark:text-green-400 font-semibold px-2.5 py-1.5 rounded-lg bg-green-500/10 active:scale-95 transition-all"
+            >
+              Върни всичко
+            </button>
+            <button
+              onClick={() => setConfirmClear(true)}
+              className="text-[11px] text-red-400 font-semibold px-2.5 py-1.5 rounded-lg bg-red-500/10 active:scale-95 transition-all"
+            >
+              Изчисти
+            </button>
+          </div>
+        )}
+        {confirmRestoreAll && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => { onRestoreAll(); setConfirmRestoreAll(false); }}
+              className="text-[11px] text-white font-semibold px-2.5 py-1.5 rounded-lg bg-green-500 active:scale-95 transition-all"
+            >
+              Да, върни
+            </button>
+            <button
+              onClick={() => setConfirmRestoreAll(false)}
+              className="text-[11px] text-gray-500 font-semibold px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-[#2c2c30] active:scale-95 transition-all"
+            >
+              Отказ
+            </button>
+          </div>
         )}
         {confirmClear && (
           <div className="flex items-center gap-1.5">
@@ -1495,10 +1521,11 @@ interface ReportsProps {
   recurringExpenses: RecurringExpense[];
   deletedItems: DeletedItem[];
   onRestoreItem: (trashId: string) => void;
+  onRestoreAll: () => void;
   onClearTrash: () => void;
 }
 
-export default function Reports({ tripHistory, expenses, maintenanceItems, currency, activeCarId, activeTrip, onUpdateExpense, onImport, cars, carDamages, fillUps, documents, checklistItems, savedLocation, expiries, recurringExpenses, deletedItems, onRestoreItem, onClearTrash }: ReportsProps) {
+export default function Reports({ tripHistory, expenses, maintenanceItems, currency, activeCarId, activeTrip, onUpdateExpense, onImport, cars, carDamages, fillUps, documents, checklistItems, savedLocation, expiries, recurringExpenses, deletedItems, onRestoreItem, onRestoreAll, onClearTrash }: ReportsProps) {
   const currentYear = new Date().getFullYear();
   return (
     <div className="space-y-4 px-4 pb-8 pt-2">
@@ -1520,6 +1547,7 @@ export default function Reports({ tripHistory, expenses, maintenanceItems, curre
       <TrashCard
         deletedItems={deletedItems}
         onRestoreItem={onRestoreItem}
+        onRestoreAll={onRestoreAll}
         onClearTrash={onClearTrash}
         currency={currency}
       />
