@@ -723,7 +723,7 @@ function AddDamageForm({ onAdd, onClose, currency }: { onAdd: (d: CarDamage) => 
         </button>
 
         {/* Photo */}
-        <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+        <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
         {photo ? (
           <div className="relative">
             <img src={photo} alt="Щета" className="w-full h-32 object-cover rounded-xl" />

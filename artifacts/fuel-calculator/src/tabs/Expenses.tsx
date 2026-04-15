@@ -123,7 +123,7 @@ function AddExpenseForm({ onAdd, onClose, currency }: { onAdd: (e: Expense) => v
           </button>
           {photo && <button type="button" onClick={() => setPhoto(undefined)} className="text-red-400"><X size={14} /></button>}
         </div>
-        <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+        <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
 
         <ActionButton onClick={submit} disabled={!canAdd} color="green">
           <Check size={16} />Запази разход

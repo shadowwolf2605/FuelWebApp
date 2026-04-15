@@ -332,7 +332,7 @@ function StartTripForm({ onStart, currency, defaultFuelType }: { onStart: (t: Ac
             )}
           </div>
         </div>
-        <input ref={odometerRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleOdometerPhoto} />
+        <input ref={odometerRef} type="file" accept="image/*" className="hidden" onChange={handleOdometerPhoto} />
         <Divider />
         <Field label="Заредени литри" placeholder="напр. 40.5" unit="л" icon={<Droplets size={17} />} iconColorClass="text-cyan-500" value={liters} onChange={setLiters} />
         <Divider />
@@ -381,7 +381,7 @@ function StartTripForm({ onStart, currency, defaultFuelType }: { onStart: (t: Ac
           </div>
         </div>
         {receiptPhoto && <img src={receiptPhoto} className="w-full h-28 object-cover rounded-xl border border-gray-200 dark:border-white/10" />}
-        <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+        <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
       </div>
       <div className="px-4 pb-4">
         <ActionButton onClick={() => {
@@ -900,7 +900,7 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
             <button onClick={shareTrip} className={`transition-colors ${shared ? "text-green-500" : "text-blue-400 hover:text-blue-500"}`}>
               {shared ? <Copy size={13} /> : <Share2 size={13} />}
             </button>
-            <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
+            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
             <button
               onClick={() => photoInputRef.current?.click()}
               title={trip.photo ? "Замени снимката" : "Добави касова бележка"}
@@ -1649,7 +1649,7 @@ function FillUpsSection({ fillUps, onAdd, onDelete, currency }: {
                     className="w-full bg-gray-50 dark:bg-[#252528] rounded-xl px-3 py-2 text-[13px] text-gray-900 dark:text-white outline-none border border-gray-100 dark:border-white/[0.07]" />
                 </div>
               </div>
-              <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+              <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
               <button onClick={() => photoRef.current?.click()}
                 className={`flex items-center justify-center gap-2 w-full py-2 rounded-xl text-[13px] transition-all ${photo ? "bg-green-500 text-white" : "bg-gray-50 dark:bg-[#252528] text-gray-400 border border-dashed border-gray-200 dark:border-white/[0.07]"}`}>
                 <Camera size={14} />{photo ? "Снимка добавена ✓" : "Снимай касов бон"}
