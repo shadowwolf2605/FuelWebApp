@@ -827,11 +827,15 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
   const [showMap, setShowMap] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [editingDate, setEditingDate] = useState(false);
-  const [dateValue, setDateValue] = useState(() => new Date(trip.endedAt).toISOString().slice(0, 10));
-  const [timeValue, setTimeValue] = useState(() => {
+  const [dateValue, setDateValue] = useState("");
+  const [timeValue, setTimeValue] = useState("");
+
+  function openDateEditor() {
     const d = new Date(trip.endedAt);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  });
+    setDateValue(d.toISOString().slice(0, 10));
+    setTimeValue(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+    setEditingDate(true);
+  }
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -890,7 +894,7 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
               ) : (
                 <span className="text-[11px] flex items-center gap-1">
                   {formatDate(trip.endedAt)}
-                  <button onClick={() => setEditingDate(true)} className="text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors ml-0.5">
+                  <button onClick={openDateEditor} className="text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors ml-0.5">
                     <Pencil size={10} />
                   </button>
                 </span>
@@ -1592,7 +1596,7 @@ function FillUpsSection({ fillUps, onAdd, onDelete, currency }: {
   const photoRef = useRef<HTMLInputElement>(null);
 
   const monthlySpend = fillUps
-    .filter(f => f.date.startsWith(new Date().toISOString().slice(0, 7)))
+    .filter(f => { const t = new Date(); return f.date.startsWith(`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}`); })
     .reduce((s, f) => s + f.liters * f.pricePerLiter, 0);
 
   function handleAdd() {

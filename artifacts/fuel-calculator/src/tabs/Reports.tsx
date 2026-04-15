@@ -1062,6 +1062,11 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
     const data = withPhotos ? buildBackupData() : buildBackupDataNoPhotos();
     const json = JSON.stringify(data);
     const code = LZString.compressToEncodedURIComponent(json);
+    // QR codes support ~3KB — photos make the code too large to scan
+    if (code.length > 3000) {
+      alert("Кодът е твърде голям за QR код.\n\nИзползвай бутона 'Сподели' или 'Код' за прехвърляне с снимки.");
+      return;
+    }
     // QR code embeds just the code — user scans and pastes into app
     try {
       const url = await QRCode.toDataURL(code, { width: 280, margin: 2, color: { dark: "#1e1e22", light: "#ffffff" } });

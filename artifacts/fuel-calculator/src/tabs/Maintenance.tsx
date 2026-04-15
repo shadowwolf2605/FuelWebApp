@@ -360,7 +360,7 @@ function ExpiryCard({ expiries, onChange, onAddExpense, onUpdateExpense, expense
         // Already paid — find existing expense and update its amount
         const existing = expenses.find(e => e.category === expMap.category && e.note === expMap.note);
         if (existing) {
-          onUpdateExpense({ ...existing, amount });
+          onUpdateExpense({ ...existing, amount, date: new Date().toISOString().slice(0, 10) });
         } else if (onAddExpense) {
           // Not found (edge case) — create new
           onAddExpense({ id: crypto.randomUUID(), category: expMap.category, amount, date: new Date().toISOString().slice(0, 10), note: expMap.note });
