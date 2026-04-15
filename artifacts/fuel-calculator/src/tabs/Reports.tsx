@@ -1226,7 +1226,8 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
             </button>
           </div>
           <p className="text-[10px] text-gray-400 dark:text-gray-500">
-            "Сподели" отваря AirDrop / iMessage / WhatsApp. Снимките не се включват.
+            "Сподели" отваря AirDrop / iMessage / WhatsApp.{" "}
+            {withPhotos ? "Снимките са включени." : "Снимките не се включват."}
           </p>
         </div>
 
@@ -1291,7 +1292,7 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
           )}
         </AnimatePresence>
 
-        <p className="text-[10px] text-orange-500/80 text-center">⚠️ Данните ще се добавят към съществуващите</p>
+        <p className="text-[10px] text-orange-500/80 text-center">⚠️ Restore ще замести съществуващите данни</p>
       </div>
     </Card>
   );
