@@ -275,6 +275,7 @@ export default function FuelCalculator() {
   }
   function deleteTrip(id: string)          { setTripHistory((h) => h.filter((t) => t.id !== id)); }
   function updateTripPhoto(id: string, photo: string) { setTripHistory((h) => h.map((t) => t.id === id ? { ...t, photo: photo || undefined } : t)); }
+  function updateTripDate(id: string, iso: string)   { setTripHistory((h) => h.map((t) => t.id === id ? { ...t, endedAt: iso } : t)); }
   function addMaintItem(item: MaintenanceItem) { setMaintItems((m) => [{ ...item, carId: effectiveCarId || undefined }, ...m]); }
   function deleteMaintItem(id: string)     { setMaintItems((m) => m.filter((i) => i.id !== id)); }
   function addDocument(doc: CarDocument)   { setDocuments((d) => [{ ...doc, carId: effectiveCarId || undefined }, ...d]); }
@@ -392,7 +393,7 @@ export default function FuelCalculator() {
       <Dashboard
         dark={dark} setDark={setDark}
         activeTrip={activeTrip} setActiveTrip={setActiveTrip}
-        tripHistory={carTripHistory} allTrips={tripHistory} addTrip={addTrip} deleteTrip={deleteTrip} updateTripPhoto={updateTripPhoto}
+        tripHistory={carTripHistory} allTrips={tripHistory} addTrip={addTrip} deleteTrip={deleteTrip} updateTripPhoto={updateTripPhoto} updateTripDate={updateTripDate}
         currency={currency}
         expenses={carExpenses}
         allExpenses={expenses}

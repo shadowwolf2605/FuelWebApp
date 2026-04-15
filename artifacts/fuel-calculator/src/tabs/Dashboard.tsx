@@ -818,7 +818,7 @@ function DriverScoreCard({ trips }: { trips: CompletedTrip[] }) {
 
 // ─── History Row ──────────────────────────────────────────────────────────────
 
-function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, currency, allTrips }: { trip: CompletedTrip; onDelete: () => void; onUpdatePhoto: (photo: string) => void; onDeletePhoto: () => void; currency: string; allTrips: CompletedTrip[] }) {
+function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate, currency, allTrips }: { trip: CompletedTrip; onDelete: () => void; onUpdatePhoto: (photo: string) => void; onDeletePhoto: () => void; onUpdateDate: (iso: string) => void; currency: string; allTrips: CompletedTrip[] }) {
   const cons = tripConsumption(trip);
   const cost = tripTotalCost(trip);
   const dist = tripDistance(trip);
@@ -826,6 +826,8 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, currency, al
   const [shared, setShared] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [editingDate, setEditingDate] = useState(false);
+  const [dateValue, setDateValue] = useState(() => new Date(trip.endedAt).toISOString().slice(0, 10));
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -833,6 +835,15 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, currency, al
     if (!file) return;
     try { onUpdatePhoto(await compressImage(file)); } catch { /* ignore */ }
     e.target.value = "";
+  }
+
+  function saveDate() {
+    if (!dateValue) return;
+    const existing = new Date(trip.endedAt);
+    const [y, m, d] = dateValue.split("-").map(Number);
+    existing.setFullYear(y, m - 1, d);
+    onUpdateDate(existing.toISOString());
+    setEditingDate(false);
   }
   const similar = dist > 0 ? allTrips.filter(t => t.id !== trip.id && tripDistance(t) > 5 && Math.abs(tripDistance(t) - dist) / dist <= 0.2) : [];
 
@@ -852,7 +863,26 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, currency, al
         <div className="flex items-start justify-between mb-2.5">
           <div>
             <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 mb-0.5">
-              <Calendar size={11} /><span className="text-[11px]">{formatDate(trip.endedAt)}</span>
+              <Calendar size={11} />
+              {editingDate ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="date"
+                    value={dateValue}
+                    onChange={e => setDateValue(e.target.value)}
+                    className="text-[11px] bg-gray-100 dark:bg-[#2c2c30] text-gray-900 dark:text-white rounded-lg px-2 py-0.5 border-0 outline-none"
+                  />
+                  <button onClick={saveDate} className="text-[11px] font-semibold text-green-500 hover:text-green-600 px-1">✓</button>
+                  <button onClick={() => setEditingDate(false)} className="text-[11px] text-gray-400 hover:text-gray-500 px-1">✕</button>
+                </div>
+              ) : (
+                <span className="text-[11px] flex items-center gap-1">
+                  {formatDate(trip.endedAt)}
+                  <button onClick={() => setEditingDate(true)} className="text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors ml-0.5">
+                    <Pencil size={10} />
+                  </button>
+                </span>
+              )}
             </div>
             {trip.note ? (
               <div className="flex items-center gap-1 text-purple-500"><MessageSquare size={11} /><span className="text-[12px] font-medium">{trip.note}</span></div>
@@ -1675,6 +1705,7 @@ interface DashboardProps {
   addTrip: (t: CompletedTrip) => void;
   deleteTrip: (id: string) => void;
   updateTripPhoto: (id: string, photo: string) => void;
+  updateTripDate: (id: string, iso: string) => void;
   currency: string;
   expenses: Expense[];
   cars: CarProfile[];
@@ -1689,7 +1720,7 @@ interface DashboardProps {
   deleteFillUp: (id: string) => void;
 }
 
-export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tripHistory, allTrips, allExpenses, allMaintItems, allDamages, allFillUps, addTrip, deleteTrip, updateTripPhoto, currency, expenses, cars, activeCar, activeCarId, setActiveCarId, addCar, updateCar, deleteCar, fillUps, addFillUp, deleteFillUp }: DashboardProps) {
+export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tripHistory, allTrips, allExpenses, allMaintItems, allDamages, allFillUps, addTrip, deleteTrip, updateTripPhoto, updateTripDate, currency, expenses, cars, activeCar, activeCarId, setActiveCarId, addCar, updateCar, deleteCar, fillUps, addFillUp, deleteFillUp }: DashboardProps) {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [historySort, setHistorySort] = useState<"date" | "dist" | "cons">("date");
   const sortedHistory = [...tripHistory].sort((a, b) => {
@@ -1799,7 +1830,7 @@ export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tr
           <div className="space-y-2.5">
             <AnimatePresence>
               {(showAllHistory ? sortedHistory : sortedHistory.slice(0, 3)).map((t) => (
-                <HistoryRow key={t.id} trip={t} onDelete={() => deleteTrip(t.id)} onUpdatePhoto={(photo) => updateTripPhoto(t.id, photo)} onDeletePhoto={() => updateTripPhoto(t.id, "")} currency={currency} allTrips={tripHistory} />
+                <HistoryRow key={t.id} trip={t} onDelete={() => deleteTrip(t.id)} onUpdatePhoto={(photo) => updateTripPhoto(t.id, photo)} onDeletePhoto={() => updateTripPhoto(t.id, "")} onUpdateDate={(iso) => updateTripDate(t.id, iso)} currency={currency} allTrips={tripHistory} />
               ))}
             </AnimatePresence>
           </div>
