@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileDown, Mail, Link2, BarChart3, Calendar, Receipt,
   TrendingUp, Download, ChevronRight, CheckCircle2, Copy,
   Fuel, Wrench, Wallet, Car, AlertTriangle, Upload, Database,
-  QrCode, Shield, ClipboardPaste,
+  QrCode, Shield, ClipboardPaste, Trash2, RotateCcw, MapPin, FileText, CreditCard,
 } from "lucide-react";
 import QRCode from "qrcode";
 import LZString from "lz-string";
@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import { Card, EmptyState } from "../components/ui";
 import { formatShortDate } from "../utils/helpers";
-import type { CompletedTrip, ActiveTrip, Expense, MaintenanceItem, CarProfile, CarDamage, FuelFillUp, ChecklistItem, SavedLocation, ExpiryDates, RecurringExpense, CarDocument } from "../types";
+import type { CompletedTrip, ActiveTrip, Expense, MaintenanceItem, CarProfile, CarDamage, FuelFillUp, ChecklistItem, SavedLocation, ExpiryDates, RecurringExpense, CarDocument, DeletedItem } from "../types";
 import { tripDistance, tripConsumption, tripTotalCost } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1298,6 +1298,182 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
   );
 }
 
+// ─── Trash Card ───────────────────────────────────────────────────────────────
+
+const TYPE_META: Record<DeletedItem["type"], { label: string; icon: ReactNode; color: string; bg: string }> = {
+  trip:        { label: "Пътуване",   icon: <MapPin size={13} />,    color: "text-blue-500",   bg: "bg-blue-500/10" },
+  document:    { label: "Документ",   icon: <FileText size={13} />,  color: "text-purple-500", bg: "bg-purple-500/10" },
+  maintenance: { label: "Поддръжка",  icon: <Wrench size={13} />,   color: "text-orange-500", bg: "bg-orange-500/10" },
+  expense:     { label: "Разход",     icon: <CreditCard size={13} />,color: "text-red-500",    bg: "bg-red-500/10" },
+  carDamage:   { label: "Щета",       icon: <Car size={13} />,       color: "text-rose-500",   bg: "bg-rose-500/10" },
+  fillUp:      { label: "Зареждане",  icon: <Fuel size={13} />,      color: "text-green-500",  bg: "bg-green-500/10" },
+};
+
+function getItemDescription(entry: DeletedItem, currency: string): string {
+  switch (entry.type) {
+    case "trip": {
+      const t = entry.item as CompletedTrip;
+      const km = Math.max(0, t.endKm - t.startKm);
+      return `${km.toFixed(0)} км · ${(t.liters * t.pricePerLiter).toFixed(2)} ${currency}`;
+    }
+    case "document": {
+      const d = entry.item as CarDocument;
+      return d.name;
+    }
+    case "maintenance": {
+      const m = entry.item as MaintenanceItem;
+      return `${m.title} · ${m.cost.toFixed(2)} ${currency}`;
+    }
+    case "expense": {
+      const e = entry.item as Expense;
+      return `${e.note || e.category} · ${e.amount.toFixed(2)} ${currency}`;
+    }
+    case "carDamage": {
+      const d = entry.item as CarDamage;
+      return d.description;
+    }
+    case "fillUp": {
+      const f = entry.item as FuelFillUp;
+      return `${f.liters.toFixed(1)} л · ${(f.liters * f.pricePerLiter).toFixed(2)} ${currency}`;
+    }
+  }
+}
+
+function getItemDate(entry: DeletedItem): string {
+  switch (entry.type) {
+    case "trip":        return (entry.item as CompletedTrip).endedAt ?? "";
+    case "document":    return (entry.item as CarDocument).addedAt ?? "";
+    case "maintenance": return (entry.item as MaintenanceItem).doneDate ?? "";
+    case "expense":     return (entry.item as Expense).date ?? "";
+    case "carDamage":   return (entry.item as CarDamage).date ?? "";
+    case "fillUp":      return (entry.item as FuelFillUp).date ?? "";
+  }
+}
+
+interface TrashCardProps {
+  deletedItems: DeletedItem[];
+  onRestoreItem: (trashId: string) => void;
+  onClearTrash: () => void;
+  currency: string;
+}
+
+function TrashCard({ deletedItems, onRestoreItem, onClearTrash, currency }: TrashCardProps) {
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const visibleItems = expanded ? deletedItems : deletedItems.slice(0, 5);
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-100 dark:border-white/[0.07]">
+        <div className="w-8 h-8 rounded-xl bg-red-500 flex items-center justify-center">
+          <Trash2 size={15} className="text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-[15px] font-semibold text-gray-900 dark:text-white">Изтрити данни</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">
+            {deletedItems.length === 0 ? "Кошчето е празно" : `${deletedItems.length} запис${deletedItems.length === 1 ? "" : "а"} — натисни за възстановяване`}
+          </p>
+        </div>
+        {deletedItems.length > 0 && !confirmClear && (
+          <button
+            onClick={() => setConfirmClear(true)}
+            className="text-[11px] text-red-400 font-semibold px-2.5 py-1.5 rounded-lg bg-red-500/10 active:scale-95 transition-all"
+          >
+            Изчисти
+          </button>
+        )}
+        {confirmClear && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => { onClearTrash(); setConfirmClear(false); }}
+              className="text-[11px] text-white font-semibold px-2.5 py-1.5 rounded-lg bg-red-500 active:scale-95 transition-all"
+            >
+              Да, изчисти
+            </button>
+            <button
+              onClick={() => setConfirmClear(false)}
+              className="text-[11px] text-gray-500 font-semibold px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-[#2c2c30] active:scale-95 transition-all"
+            >
+              Отказ
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="p-3 space-y-2">
+        {deletedItems.length === 0 ? (
+          <div className="py-6 flex flex-col items-center gap-2 text-gray-300 dark:text-gray-600">
+            <Trash2 size={32} strokeWidth={1.2} />
+            <p className="text-[12px]">Все още нищо не е изтрито</p>
+          </div>
+        ) : (
+          <>
+            <AnimatePresence initial={false}>
+              {visibleItems.map((entry) => {
+                const meta = TYPE_META[entry.type];
+                const desc = getItemDescription(entry, currency);
+                const itemDate = getItemDate(entry);
+                const deletedAgo = (() => {
+                  const ms = Date.now() - new Date(entry.deletedAt).getTime();
+                  const mins = Math.floor(ms / 60000);
+                  const hrs  = Math.floor(ms / 3600000);
+                  const days = Math.floor(ms / 86400000);
+                  if (mins < 1) return "преди малко";
+                  if (mins < 60) return `преди ${mins} мин`;
+                  if (hrs < 24) return `преди ${hrs} ч`;
+                  return `преди ${days} дни`;
+                })();
+
+                return (
+                  <motion.div
+                    key={entry.id}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-[#1e1e22] border border-gray-100 dark:border-white/[0.05]"
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${meta.bg} ${meta.color}`}>
+                      {meta.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className={`text-[10px] font-bold uppercase tracking-wide ${meta.color}`}>{meta.label}</span>
+                        {itemDate && (
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500">{formatShortDate(itemDate)}</span>
+                        )}
+                      </div>
+                      <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200 truncate">{desc}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Изтрито {deletedAgo}</p>
+                    </div>
+                    <button
+                      onClick={() => onRestoreItem(entry.id)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400 text-[11px] font-semibold active:scale-95 transition-all flex-shrink-0"
+                    >
+                      <RotateCcw size={11} />Върни
+                    </button>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+
+            {deletedItems.length > 5 && (
+              <button
+                onClick={() => setExpanded(v => !v)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold text-gray-500 dark:text-gray-400 active:opacity-70 transition-all"
+              >
+                <ChevronRight size={13} className={`transition-transform ${expanded ? "rotate-90" : ""}`} />
+                {expanded ? "Покажи по-малко" : `Покажи още ${deletedItems.length - 5}`}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 // ─── Reports Tab ──────────────────────────────────────────────────────────────
 
 interface ReportsProps {
@@ -1317,9 +1493,12 @@ interface ReportsProps {
   savedLocation: SavedLocation | null;
   expiries: ExpiryDates;
   recurringExpenses: RecurringExpense[];
+  deletedItems: DeletedItem[];
+  onRestoreItem: (trashId: string) => void;
+  onClearTrash: () => void;
 }
 
-export default function Reports({ tripHistory, expenses, maintenanceItems, currency, activeCarId, activeTrip, onUpdateExpense, onImport, cars, carDamages, fillUps, documents, checklistItems, savedLocation, expiries, recurringExpenses }: ReportsProps) {
+export default function Reports({ tripHistory, expenses, maintenanceItems, currency, activeCarId, activeTrip, onUpdateExpense, onImport, cars, carDamages, fillUps, documents, checklistItems, savedLocation, expiries, recurringExpenses, deletedItems, onRestoreItem, onClearTrash }: ReportsProps) {
   const currentYear = new Date().getFullYear();
   return (
     <div className="space-y-4 px-4 pb-8 pt-2">
@@ -1338,6 +1517,12 @@ export default function Reports({ tripHistory, expenses, maintenanceItems, curre
         onRestore={onImport}
       />
       <ImportCard onImport={onImport} trips={tripHistory} expenses={expenses} maint={maintenanceItems} />
+      <TrashCard
+        deletedItems={deletedItems}
+        onRestoreItem={onRestoreItem}
+        onClearTrash={onClearTrash}
+        currency={currency}
+      />
 
       {/* ─── Wrapped Section ─────────────────────────────────────────── */}
       <div className="rounded-3xl overflow-hidden" style={{ background: "linear-gradient(160deg, #0f0c29 0%, #302b63 50%, #24243e 100%)" }}>

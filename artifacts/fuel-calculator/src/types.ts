@@ -153,6 +153,17 @@ export function tripTotalCost(t: CompletedTrip) { return t.liters * t.pricePerLi
 
 export type AppTheme = "blue" | "purple" | "green" | "orange" | "rose";
 
+// ─── Trash / Recycle Bin ──────────────────────────────────────────────────────
+
+export type DeletedItemType = "trip" | "document" | "maintenance" | "expense" | "carDamage" | "fillUp";
+
+export interface DeletedItem {
+  id: string;
+  type: DeletedItemType;
+  deletedAt: string;
+  item: CompletedTrip | CarDocument | MaintenanceItem | Expense | CarDamage | FuelFillUp;
+}
+
 export interface ParkingTimer {
   startedAt: string;       // ISO timestamp
   durationMinutes: number; // how long paid for

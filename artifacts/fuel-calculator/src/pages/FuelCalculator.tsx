@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocalStorage } from "../hooks/useLocalStorage";
-import type { ActiveTrip, CompletedTrip, MaintenanceItem, CarDocument, ChecklistItem, Expense, SavedLocation, CarProfile, ExpiryDates, AppTheme, RecurringExpense, CarDamage, ParkingTimer, FuelFillUp } from "../types";
+import type { ActiveTrip, CompletedTrip, MaintenanceItem, CarDocument, ChecklistItem, Expense, SavedLocation, CarProfile, ExpiryDates, AppTheme, RecurringExpense, CarDamage, ParkingTimer, FuelFillUp, DeletedItem, DeletedItemType } from "../types";
 import Dashboard from "../tabs/Dashboard";
 import Maintenance from "../tabs/Maintenance";
 import Maps, { DEFAULT_CHECKLIST } from "../tabs/Maps";
@@ -213,6 +213,7 @@ export default function FuelCalculator() {
   const [cars, setCars] = useLocalStorage<CarProfile[]>("fa_cars", []);
   const [activeCarId, setActiveCarId] = useLocalStorage<string>("fa_active_car", "");
   const [fillUps, setFillUps] = useLocalStorage<FuelFillUp[]>("fa_fillups", []);
+  const [deletedItems, setDeletedItems] = useLocalStorage<DeletedItem[]>("fa_trash", []);
 
   const activeCar = cars.find(c => c.id === activeCarId) ?? cars[0] ?? null;
   const effectiveCarId = activeCar?.id ?? "";
@@ -273,10 +274,47 @@ export default function FuelCalculator() {
       return [{ id: fillUpId, date: (t.endedAt ?? t.startedAt).slice(0, 10), liters: t.liters, pricePerLiter: t.pricePerLiter, photo: t.photo, carId: t.carId }, ...fs];
     });
   }
+  function addToTrash(type: DeletedItemType, item: DeletedItem["item"]) {
+    const entry: DeletedItem = { id: `trash_${Date.now()}_${Math.random().toString(36).slice(2)}`, type, deletedAt: new Date().toISOString(), item };
+    setDeletedItems(d => [entry, ...d]);
+  }
+
   function deleteTrip(id: string) {
+    const trip = tripHistory.find(t => t.id === id);
+    if (trip) addToTrash("trip", trip);
     setTripHistory((h) => h.filter((t) => t.id !== id));
     // Also remove the auto-generated fill-up so it doesn't become an orphan
     setFillUps((fs) => fs.filter((f) => f.id !== `trip_${id}`));
+  }
+
+  function restoreDeletedItem(trashId: string) {
+    const entry = deletedItems.find(d => d.id === trashId);
+    if (!entry) return;
+    switch (entry.type) {
+      case "trip":
+        setTripHistory(h => [entry.item as CompletedTrip, ...h]);
+        break;
+      case "document":
+        setDocuments(d => [entry.item as CarDocument, ...d]);
+        break;
+      case "maintenance":
+        setMaintItems(m => [entry.item as MaintenanceItem, ...m]);
+        break;
+      case "expense":
+        setExpenses(ex => [entry.item as Expense, ...ex]);
+        break;
+      case "carDamage":
+        setCarDamages(ds => [entry.item as CarDamage, ...ds]);
+        break;
+      case "fillUp":
+        setFillUps(fs => [entry.item as FuelFillUp, ...fs]);
+        break;
+    }
+    setDeletedItems(d => d.filter(x => x.id !== trashId));
+  }
+
+  function clearTrash() {
+    setDeletedItems([]);
   }
   function updateTripPhoto(id: string, photo: string) { setTripHistory((h) => h.map((t) => t.id === id ? { ...t, photo: photo || undefined } : t)); }
   function updateTripDate(id: string, iso: string) {
@@ -286,17 +324,33 @@ export default function FuelCalculator() {
     setFillUps((fs) => fs.map((f) => f.id === fillUpId ? { ...f, date: iso.slice(0, 10) } : f));
   }
   function addMaintItem(item: MaintenanceItem) { setMaintItems((m) => [{ ...item, carId: effectiveCarId || undefined }, ...m]); }
-  function deleteMaintItem(id: string)     { setMaintItems((m) => m.filter((i) => i.id !== id)); }
+  function deleteMaintItem(id: string) {
+    const item = maintItems.find(i => i.id === id);
+    if (item) addToTrash("maintenance", item);
+    setMaintItems((m) => m.filter((i) => i.id !== id));
+  }
   function addDocument(doc: CarDocument)   { setDocuments((d) => [{ ...doc, carId: effectiveCarId || undefined }, ...d]); }
-  function deleteDocument(id: string)      { setDocuments((d) => d.filter((doc) => doc.id !== id)); }
+  function deleteDocument(id: string) {
+    const doc = documents.find(d => d.id === id);
+    if (doc) addToTrash("document", doc);
+    setDocuments((d) => d.filter((doc) => doc.id !== id));
+  }
   function addExpense(e: Expense)          { setExpenses((ex) => [{ ...e, carId: effectiveCarId || undefined }, ...ex]); }
-  function deleteExpense(id: string)       { setExpenses((ex) => ex.filter((e) => e.id !== id)); }
+  function deleteExpense(id: string) {
+    const exp = expenses.find(e => e.id === id);
+    if (exp) addToTrash("expense", exp);
+    setExpenses((ex) => ex.filter((e) => e.id !== id));
+  }
   function updateExpense(e: Expense)       { setExpenses((ex) => ex.map(x => x.id === e.id ? e : x)); }
 
   function addRecurringExpense(r: RecurringExpense) { setRecurringExpenses(rs => [...rs, { ...r, carId: effectiveCarId || undefined }]); }
   function deleteRecurringExpense(id: string) { setRecurringExpenses(rs => rs.filter(r => r.id !== id)); }
   function addCarDamage(d: CarDamage) { setCarDamages(ds => [{ ...d, carId: effectiveCarId || undefined }, ...ds]); }
-  function deleteCarDamage(id: string) { setCarDamages(ds => ds.filter(d => d.id !== id)); }
+  function deleteCarDamage(id: string) {
+    const dmg = carDamages.find(d => d.id === id);
+    if (dmg) addToTrash("carDamage", dmg);
+    setCarDamages(ds => ds.filter(d => d.id !== id));
+  }
   function toggleCarDamageRepaired(id: string) { setCarDamages(ds => ds.map(d => d.id === id ? { ...d, repaired: !d.repaired } : d)); }
   function payRecurringExpense(id: string) {
     setRecurringExpenses(rs => rs.map(r => {
@@ -309,7 +363,13 @@ export default function FuelCalculator() {
 
   function addFillUp(f: FuelFillUp) { setFillUps(fs => [{ ...f, carId: effectiveCarId || undefined }, ...fs]); }
 
-  function deleteFillUp(id: string) { setFillUps(fs => fs.filter(f => f.id !== id)); }
+  function deleteFillUp(id: string) {
+    if (!id.startsWith("trip_")) {
+      const fillUp = fillUps.find(f => f.id === id);
+      if (fillUp) addToTrash("fillUp", fillUp);
+    }
+    setFillUps(fs => fs.filter(f => f.id !== id));
+  }
 
   function addCar(car: CarProfile)         { setCars(cs => [...cs, car]); setActiveCarId(car.id); }
   function updateCar(car: CarProfile)      { setCars(cs => cs.map(c => c.id === car.id ? car : c)); }
@@ -502,6 +562,9 @@ export default function FuelCalculator() {
         savedLocation={savedLocation}
         expiries={carExpiries}
         recurringExpenses={carRecurringExpenses}
+        deletedItems={deletedItems}
+        onRestoreItem={restoreDeletedItem}
+        onClearTrash={clearTrash}
         onImport={(data) => {
           // Replace arrays entirely — merging by ID causes duplicates when the same
           // record was created on a different device and therefore has a different ID.
