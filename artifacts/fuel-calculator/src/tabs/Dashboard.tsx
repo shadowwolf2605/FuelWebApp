@@ -818,7 +818,7 @@ function DriverScoreCard({ trips }: { trips: CompletedTrip[] }) {
 
 // ─── History Row ──────────────────────────────────────────────────────────────
 
-function HistoryRow({ trip, onDelete, onUpdatePhoto, currency, allTrips }: { trip: CompletedTrip; onDelete: () => void; onUpdatePhoto: (photo: string) => void; currency: string; allTrips: CompletedTrip[] }) {
+function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, currency, allTrips }: { trip: CompletedTrip; onDelete: () => void; onUpdatePhoto: (photo: string) => void; onDeletePhoto: () => void; currency: string; allTrips: CompletedTrip[] }) {
   const cons = tripConsumption(trip);
   const cost = tripTotalCost(trip);
   const dist = tripDistance(trip);
@@ -878,6 +878,15 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, currency, allTrips }: { tri
             >
               <Camera size={13} />
             </button>
+            {trip.photo && (
+              <button
+                onClick={() => { if (window.confirm("Изтрий снимката от това пътуване?")) onDeletePhoto(); }}
+                title="Изтрий снимката"
+                className="text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors"
+              >
+                <X size={13} />
+              </button>
+            )}
             <button onClick={onDelete} className="text-red-400 hover:text-red-500"><Trash2 size={13} /></button>
           </div>
         </div>
@@ -1790,7 +1799,7 @@ export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tr
           <div className="space-y-2.5">
             <AnimatePresence>
               {(showAllHistory ? sortedHistory : sortedHistory.slice(0, 3)).map((t) => (
-                <HistoryRow key={t.id} trip={t} onDelete={() => deleteTrip(t.id)} onUpdatePhoto={(photo) => updateTripPhoto(t.id, photo)} currency={currency} allTrips={tripHistory} />
+                <HistoryRow key={t.id} trip={t} onDelete={() => deleteTrip(t.id)} onUpdatePhoto={(photo) => updateTripPhoto(t.id, photo)} onDeletePhoto={() => updateTripPhoto(t.id, "")} currency={currency} allTrips={tripHistory} />
               ))}
             </AnimatePresence>
           </div>

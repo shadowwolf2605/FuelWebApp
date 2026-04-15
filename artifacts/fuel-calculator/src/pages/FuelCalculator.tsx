@@ -274,7 +274,7 @@ export default function FuelCalculator() {
     });
   }
   function deleteTrip(id: string)          { setTripHistory((h) => h.filter((t) => t.id !== id)); }
-  function updateTripPhoto(id: string, photo: string) { setTripHistory((h) => h.map((t) => t.id === id ? { ...t, photo } : t)); }
+  function updateTripPhoto(id: string, photo: string) { setTripHistory((h) => h.map((t) => t.id === id ? { ...t, photo: photo || undefined } : t)); }
   function addMaintItem(item: MaintenanceItem) { setMaintItems((m) => [{ ...item, carId: effectiveCarId || undefined }, ...m]); }
   function deleteMaintItem(id: string)     { setMaintItems((m) => m.filter((i) => i.id !== id)); }
   function addDocument(doc: CarDocument)   { setDocuments((d) => [{ ...doc, carId: effectiveCarId || undefined }, ...d]); }
