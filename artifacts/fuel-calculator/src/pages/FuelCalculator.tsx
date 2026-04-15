@@ -471,7 +471,6 @@ export default function FuelCalculator() {
           if (data.maintenance?.length)      setMaintItems(data.maintenance);
           if (data.cars?.length)             setCars(data.cars);
           if (data.carDamages?.length)       setCarDamages(data.carDamages);
-          if (data.fillUps?.length)          setFillUps(data.fillUps);
           if (data.documents?.length)        setDocuments(data.documents);
           if (data.recurringExpenses?.length) setRecurringExpenses(data.recurringExpenses);
           if (data.checklistItems?.length)   setChecklistItems(data.checklistItems!);
@@ -480,6 +479,17 @@ export default function FuelCalculator() {
           if (data.currency)    setCurrency(data.currency);
           if (data.activeCarId) setActiveCarId(data.activeCarId);
           if (data.activeTrip !== undefined) setActiveTrip(data.activeTrip ?? null);
+          // Restore fill-ups: merge manually-added ones from backup with auto-generated
+          // ones rebuilt from trips (v5 backups omit auto fill-ups to save space)
+          const manualFillUps = (data.fillUps ?? []).filter(f => !f.id.startsWith("trip_"));
+          const autoFillUps = (data.trips ?? []).map(t => ({
+            id: `trip_${t.id}`,
+            date: (t.endedAt ?? t.startedAt).slice(0, 10),
+            liters: t.liters,
+            pricePerLiter: t.pricePerLiter,
+            carId: t.carId,
+          }));
+          setFillUps([...autoFillUps, ...manualFillUps]);
         }}
       />
     ),
