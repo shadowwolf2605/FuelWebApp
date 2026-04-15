@@ -803,7 +803,7 @@ function ImportCard({ onImport, trips, expenses, maint }: {
           {status === "success" ? "Успешно импортиране!" : status === "error" ? "Грешка в JSON файла" : "Импортирай от JSON"}
         </motion.button>
         <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
-        <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">Импортът добавя данните към съществуващите</p>
+        <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">Импортът замества съществуващите данни</p>
       </div>
     </Card>
   );
