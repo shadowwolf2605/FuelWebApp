@@ -273,7 +273,11 @@ export default function FuelCalculator() {
       return [{ id: fillUpId, date: (t.endedAt ?? t.startedAt).slice(0, 10), liters: t.liters, pricePerLiter: t.pricePerLiter, photo: t.photo, carId: t.carId }, ...fs];
     });
   }
-  function deleteTrip(id: string)          { setTripHistory((h) => h.filter((t) => t.id !== id)); }
+  function deleteTrip(id: string) {
+    setTripHistory((h) => h.filter((t) => t.id !== id));
+    // Also remove the auto-generated fill-up so it doesn't become an orphan
+    setFillUps((fs) => fs.filter((f) => f.id !== `trip_${id}`));
+  }
   function updateTripPhoto(id: string, photo: string) { setTripHistory((h) => h.map((t) => t.id === id ? { ...t, photo: photo || undefined } : t)); }
   function updateTripDate(id: string, iso: string) {
     setTripHistory((h) => h.map((t) => t.id === id ? { ...t, endedAt: iso } : t));
@@ -322,6 +326,41 @@ export default function FuelCalculator() {
     setCarDamages(ds => ds.map(d => d.carId === id ? { ...d, carId: undefined } : d));
     setFillUps(fs => fs.map(f => f.carId === id ? { ...f, carId: undefined } : f));
   }
+
+  // ── Fill-up heal: keep auto fill-ups in sync with trips ──────────────────────
+  // Runs whenever trips change. Fixes three things:
+  //  1. Orphan fill-ups (trip was deleted but fill-up survived)
+  //  2. Missing fill-ups (trip exists but auto fill-up was never created)
+  //  3. Date mismatch (trip date was edited before the sync fix was deployed)
+  useEffect(() => {
+    if (!tripHistory.length) return;
+    const tripMap = new Map(tripHistory.map(t => [t.id, t]));
+    setFillUps(fs => {
+      let changed = false;
+      // 1. Remove orphan auto fill-ups
+      let result = fs.filter(f => {
+        if (f.id.startsWith("trip_") && !tripMap.has(f.id.slice(5))) { changed = true; return false; }
+        return true;
+      });
+      const existingIds = new Set(result.map(f => f.id));
+      // 2 & 3. Ensure each trip has a correctly-dated fill-up
+      for (const t of tripHistory) {
+        const fid = `trip_${t.id}`;
+        const correctDate = (t.endedAt ?? t.startedAt).slice(0, 10);
+        if (!existingIds.has(fid)) {
+          result = [{ id: fid, date: correctDate, liters: t.liters, pricePerLiter: t.pricePerLiter, carId: t.carId }, ...result];
+          changed = true;
+        } else {
+          const cur = result.find(f => f.id === fid);
+          if (cur && cur.date !== correctDate) {
+            result = result.map(f => f.id === fid ? { ...f, date: correctDate } : f);
+            changed = true;
+          }
+        }
+      }
+      return changed ? result : fs; // same reference = no re-render loop
+    });
+  }, [tripHistory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     async function checkNotifications() {
