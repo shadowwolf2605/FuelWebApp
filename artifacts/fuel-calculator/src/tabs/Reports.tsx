@@ -1061,8 +1061,9 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
     return iso.length > 16 ? iso.slice(0, 16) : iso;
   }
 
-  // Strips photos, GPS traces, auto-derived fill-ups, and empty fields
+  // Strips photos, GPS traces, auto-derived fill-ups, checklist and active trip
   // Auto fill-ups (id = trip_<tripId>) are regenerated on restore — no need to backup twice
+  // checklistItems and activeTrip are excluded — they're large and easy to re-create
   function buildBackupDataNoPhotos(): AllBackupData {
     return {
       version: 5,
@@ -1076,16 +1077,13 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
       carDamages: carDamages.map(({ photo: _p, ...x }) => compact(x as object) as typeof carDamages[0]),
       documents:  documents.map(doc => compact({ ...doc, dataUrl: "" }) as typeof documents[0]),
       maintenance: maint.map(m => compact(m as object) as typeof maint[0]),
-      checklistItems,
       savedLocation,
-      expiries,
+      expiries:   expiries ? compact(expiries as object) as typeof expiries : expiries,
       recurringExpenses: recurringExpenses.map(r => compact(r as object) as typeof recurringExpenses[0]),
       currency,
       activeCarId,
-      activeTrip: activeTrip
-        ? compact({ ...activeTrip, routePoints: undefined, receiptPhoto: undefined,
-            startedAt: shortDate(activeTrip.startedAt) } as object) as typeof activeTrip
-        : null,
+      // checklistItems — omitted (12 items = ~700 chars, easy to recreate)
+      // activeTrip     — omitted (in-progress trip not needed in transfer backup)
     };
   }
 
