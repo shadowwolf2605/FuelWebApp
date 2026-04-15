@@ -722,7 +722,7 @@ function ImportCard({ onImport, trips, expenses, maint }: {
 
     // Trips sheet
     rows.push("=== ПЪТУВАНИЯ ===");
-    rows.push("Дата,Начало км,Край км,Разстояние км,Литри,Цена/л,Общо лв,Разход л/100км,Бележка,Гориво");
+    rows.push("Дата,Начало км,Край км,Разстояние км,Литри,Цена/л,Общо,Разход л/100км,Бележка,Гориво");
     for (const t of trips) {
       const dist = (t.endKm - t.startKm).toFixed(1);
       const cons = t.endKm > t.startKm ? ((t.liters / (t.endKm - t.startKm)) * 100).toFixed(2) : "0";

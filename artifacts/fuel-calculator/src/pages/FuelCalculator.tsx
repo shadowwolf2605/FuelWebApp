@@ -419,6 +419,8 @@ export default function FuelCalculator() {
         deleteDamage={deleteCarDamage}
         toggleDamageRepaired={toggleCarDamageRepaired}
         addExpense={addExpense}
+        updateExpense={updateExpense}
+        expenses={carExpenses}
       />
     ),
     maps: (

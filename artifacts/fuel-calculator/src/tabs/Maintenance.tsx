@@ -314,10 +314,13 @@ const EXPIRY_EXPENSE_MAP: Partial<Record<keyof ExpiryDates, { category: Expense[
   inspection: { category: "inspection", note: "Технически преглед" },
 };
 
-function ExpiryCard({ expiries, onChange, onAddExpense }: {
+function ExpiryCard({ expiries, onChange, onAddExpense, onUpdateExpense, expenses, currency }: {
   expiries: ExpiryDates;
   onChange: (e: ExpiryDates) => void;
   onAddExpense?: (e: Expense) => void;
+  onUpdateExpense?: (e: Expense) => void;
+  expenses?: Expense[];
+  currency?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(expiries);
@@ -351,16 +354,23 @@ function ExpiryCard({ expiries, onChange, onAddExpense }: {
     const amountKey = AMOUNT_KEYS[key];
     const expMap = EXPIRY_EXPENSE_MAP[key];
     const alreadyPaid = !!expiries[paidKey as keyof ExpiryDates];
-    // Only create a new expense entry when first marking as paid with an amount
-    if (!alreadyPaid && amount > 0 && expMap && onAddExpense) {
-      onAddExpense({
-        id: crypto.randomUUID(),
-        category: expMap.category,
-        amount,
-        date: new Date().toISOString().slice(0, 10),
-        note: expMap.note,
-      });
+
+    if (amount > 0 && expMap) {
+      if (alreadyPaid && onUpdateExpense && expenses) {
+        // Already paid — find existing expense and update its amount
+        const existing = expenses.find(e => e.category === expMap.category && e.note === expMap.note);
+        if (existing) {
+          onUpdateExpense({ ...existing, amount });
+        } else if (onAddExpense) {
+          // Not found (edge case) — create new
+          onAddExpense({ id: crypto.randomUUID(), category: expMap.category, amount, date: new Date().toISOString().slice(0, 10), note: expMap.note });
+        }
+      } else if (!alreadyPaid && onAddExpense) {
+        // First time paying — create new expense
+        onAddExpense({ id: crypto.randomUUID(), category: expMap.category, amount, date: new Date().toISOString().slice(0, 10), note: expMap.note });
+      }
     }
+
     onChange({
       ...expiries,
       [paidKey]: true,
@@ -456,7 +466,7 @@ function ExpiryCard({ expiries, onChange, onAddExpense }: {
                       <>
                         <CheckCircle2 size={10} />
                         Платена
-                        {(() => { const ak = AMOUNT_KEYS[item.key]; const amt = ak ? (expiries[ak] as number | undefined) : undefined; return amt ? ` · ${amt} лв` : ""; })()}
+                        {(() => { const ak = AMOUNT_KEYS[item.key]; const amt = ak ? (expiries[ak] as number | undefined) : undefined; return amt ? ` · ${amt} ${currency ?? "€"}` : ""; })()}
                       </>
                     ) : "Неплатена"}
                   </button>
@@ -473,7 +483,7 @@ function ExpiryCard({ expiries, onChange, onAddExpense }: {
                           type="text" inputMode="decimal"
                           value={payAmountText}
                           onChange={e => setPayAmountText(e.target.value.replace(",", "."))}
-                          placeholder="напр. 97.00 лв"
+                          placeholder={`напр. 97.00 ${currency ?? "€"}`}
                           autoFocus
                           className="w-full bg-gray-50 dark:bg-[#252528] border border-gray-200 dark:border-white/20 rounded-xl px-3 py-2 text-[14px] font-semibold text-gray-900 dark:text-white outline-none"
                         />
@@ -886,9 +896,11 @@ interface MaintenanceProps {
   deleteDamage: (id: string) => void;
   toggleDamageRepaired: (id: string) => void;
   addExpense?: (e: Expense) => void;
+  updateExpense?: (e: Expense) => void;
+  expenses?: Expense[];
 }
 
-export default function Maintenance({ items, addItem, deleteItem, documents, addDocument, deleteDocument, currency, expiries, setExpiries, activeCar, onUpdateActiveCar, damages, addDamage, deleteDamage, toggleDamageRepaired, addExpense }: MaintenanceProps) {
+export default function Maintenance({ items, addItem, deleteItem, documents, addDocument, deleteDocument, currency, expiries, setExpiries, activeCar, onUpdateActiveCar, damages, addDamage, deleteDamage, toggleDamageRepaired, addExpense, updateExpense, expenses }: MaintenanceProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showDocs, setShowDocs] = useState(true);
 
@@ -898,7 +910,7 @@ export default function Maintenance({ items, addItem, deleteItem, documents, add
   return (
     <div className="space-y-4 px-4 pb-8 pt-2">
       <NextUpcomingBanner items={items} />
-      <ExpiryCard expiries={expiries} onChange={setExpiries} onAddExpense={addExpense} />
+      <ExpiryCard expiries={expiries} onChange={setExpiries} onAddExpense={addExpense} onUpdateExpense={updateExpense} expenses={expenses} currency={currency} />
       {activeCar && onUpdateActiveCar && (
         <OilReminderCard car={activeCar} onUpdate={onUpdateActiveCar} />
       )}

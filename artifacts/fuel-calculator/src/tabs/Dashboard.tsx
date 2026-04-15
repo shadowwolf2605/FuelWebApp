@@ -1690,7 +1690,7 @@ function FillUpsSection({ fillUps, onAdd, onDelete, currency }: {
                   <span className="text-[11px] text-gray-400">@ {f.pricePerLiter.toFixed(2)} {currency}</span>
                   {f.station && <span className="text-[10px] text-blue-500 bg-blue-500/10 px-1.5 py-0.5 rounded-full">{f.station}</span>}
                 </div>
-                <p className="text-[11px] text-gray-400">{f.date} · {(f.liters * f.pricePerLiter).toFixed(2)} {currency}</p>
+                <p className="text-[11px] text-gray-400">{formatShortDate(f.date)} · {(f.liters * f.pricePerLiter).toFixed(2)} {currency}</p>
               </div>
               <button onClick={() => onDelete(f.id)} className="text-red-400 flex-shrink-0"><Trash2 size={13} /></button>
             </div>
