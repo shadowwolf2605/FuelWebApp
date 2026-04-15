@@ -476,7 +476,7 @@ function CarWashCard({ expenses, onAdd, onDelete, currency }: { expenses: Expens
 
       {washes.length === 0 && !showAdd && (
         <div className="p-4">
-          <p className="text-[13px] text-gray-400 text-center">Няма записани мойки</p>
+          <p className="text-[13px] text-gray-400 text-center">Няма записани данни</p>
         </div>
       )}
 

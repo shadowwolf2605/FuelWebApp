@@ -1034,8 +1034,22 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
     };
   }
 
+  // Strips all base64 photos — makes the code 10-20x shorter
+  function buildBackupDataNoPhotos(): AllBackupData {
+    const d = buildBackupData();
+    return {
+      ...d,
+      trips:      d.trips?.map(({ photo: _p, ...t }) => t as typeof trips[0]) ?? [],
+      expenses:   d.expenses?.map(({ photo: _p, ...e }) => e as typeof expenses[0]) ?? [],
+      fillUps:    d.fillUps?.map(({ photo: _p, ...f }) => f as typeof fillUps[0]) ?? [],
+      cars:       d.cars?.map(({ photo: _p, ...c }) => c as typeof cars[0]) ?? [],
+      carDamages: d.carDamages?.map(({ photo: _p, ...x }) => x as typeof carDamages[0]) ?? [],
+      documents:  d.documents?.map(doc => ({ ...doc, dataUrl: "" })) ?? [],
+    };
+  }
+
   function generateCode() {
-    const data = buildBackupData();
+    const data = buildBackupDataNoPhotos();
     const json = JSON.stringify(data);
     const code = LZString.compressToEncodedURIComponent(json);
     setBackupCode(code);
@@ -1044,7 +1058,7 @@ function BackupCard({ trips, expenses, maint, cars, carDamages, fillUps, documen
   }
 
   async function generateQR() {
-    const data = buildBackupData();
+    const data = buildBackupDataNoPhotos();
     const json = JSON.stringify(data);
     const code = LZString.compressToEncodedURIComponent(json);
     // QR code embeds just the code — user scans and pastes into app
