@@ -420,34 +420,49 @@ export default function FuelCalculator() {
   }
 
   // ── Fill-up heal: keep auto fill-ups in sync with trips ──────────────────────
-  // Runs whenever trips change. Fixes three things:
+  // Runs whenever trips change. Fixes four things:
   //  1. Orphan fill-ups (trip was deleted but fill-up survived)
-  //  2. Missing fill-ups (trip exists but auto fill-up was never created)
-  //  3. Date mismatch (trip date was edited before the sync fix was deployed)
+  //  2. Old fill-ups without trip_ prefix — adopt them by re-IDing to trip_<tripId>
+  //     so date edits can find and update them going forward
+  //  3. Missing fill-ups (trip exists but no matching fill-up at all)
+  //  4. Date mismatch on existing trip_ fill-ups
   useEffect(() => {
     if (!tripHistory.length) return;
     const tripMap = new Map(tripHistory.map(t => [t.id, t]));
     setFillUps(fs => {
       let changed = false;
-      // 1. Remove orphan auto fill-ups
+      // 1. Remove orphan auto fill-ups (trip_ prefix but trip no longer exists)
       let result = fs.filter(f => {
         if (f.id.startsWith("trip_") && !tripMap.has(f.id.slice(5))) { changed = true; return false; }
         return true;
       });
-      const existingIds = new Set(result.map(f => f.id));
-      // 2 & 3. Ensure each trip has a correctly-dated fill-up
+
       for (const t of tripHistory) {
         const fid = `trip_${t.id}`;
         const correctDate = (t.endedAt ?? t.startedAt).slice(0, 10);
-        if (!existingIds.has(fid)) {
-          result = [{ id: fid, date: correctDate, liters: t.liters, pricePerLiter: t.pricePerLiter, carId: t.carId }, ...result];
-          changed = true;
-        } else {
-          const cur = result.find(f => f.id === fid);
-          if (cur && cur.date !== correctDate) {
-            result = result.map(f => f.id === fid ? { ...f, date: correctDate } : f);
-            changed = true;
+        const canonical = result.find(f => f.id === fid);
+
+        if (!canonical) {
+          // 2. Look for an "old-style" fill-up (no trip_ prefix) that matches this trip
+          //    by liters + pricePerLiter + carId — adopt it by giving it the canonical ID
+          const oldIdx = result.findIndex(f =>
+            !f.id.startsWith("trip_") &&
+            f.liters === t.liters &&
+            f.pricePerLiter === t.pricePerLiter &&
+            (f.carId ?? "") === (t.carId ?? "")
+          );
+          if (oldIdx !== -1) {
+            // Re-ID the old fill-up and sync its date
+            result = result.map((f, i) => i === oldIdx ? { ...f, id: fid, date: correctDate } : f);
+          } else {
+            // 3. No match — create a new fill-up from scratch
+            result = [{ id: fid, date: correctDate, liters: t.liters, pricePerLiter: t.pricePerLiter, carId: t.carId }, ...result];
           }
+          changed = true;
+        } else if (canonical.date !== correctDate) {
+          // 4. Date out of sync — fix it
+          result = result.map(f => f.id === fid ? { ...f, date: correctDate } : f);
+          changed = true;
         }
       }
       return changed ? result : fs; // same reference = no re-render loop

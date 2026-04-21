@@ -1285,9 +1285,9 @@ function SpeedometerGauge({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
-      className="flex flex-col items-center"
+      className="flex flex-col items-center flex-1 min-w-0"
     >
-      <svg width={120} height={72} viewBox="0 0 120 72">
+      <svg width="100%" viewBox="0 0 120 72" style={{ maxWidth: 110 }}>
         {/* Track arc */}
         <path
           d={`M 12,60 A ${R},${R} 0 0,1 108,60`}
@@ -1347,7 +1347,7 @@ function SpeedometerDashboard({ trips }: { trips: CompletedTrip[] }) {
         <Gauge size={15} className="text-gray-900 dark:text-white" />
         <span className="text-[14px] font-semibold text-gray-900 dark:text-white">Табло</span>
       </div>
-      <div className="flex justify-around">
+      <div className="flex justify-around gap-1 overflow-hidden">
         <SpeedometerGauge
           value={avgCons}
           max={15}
