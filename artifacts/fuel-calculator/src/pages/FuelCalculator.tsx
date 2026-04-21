@@ -628,18 +628,26 @@ export default function FuelCalculator() {
           if (data.expiries)    setExpiries(data.expiries);
           if (data.currency)    setCurrency(data.currency);
           if (data.activeCarId) setActiveCarId(data.activeCarId);
-          if (data.activeTrip !== undefined) setActiveTrip(data.activeTrip ?? null);
-          // Restore fill-ups: merge manually-added ones from backup with auto-generated
-          // ones rebuilt from trips (v5 backups omit auto fill-ups to save space)
-          const manualFillUps = (data.fillUps ?? []).filter(f => !f.id.startsWith("trip_"));
-          const autoFillUps = (data.trips ?? []).map(t => ({
-            id: `trip_${t.id}`,
-            date: (t.endedAt ?? t.startedAt).slice(0, 10),
-            liters: t.liters,
-            pricePerLiter: t.pricePerLiter,
-            carId: t.carId,
-          }));
-          setFillUps([...autoFillUps, ...manualFillUps]);
+          // Clear active trip if its car is no longer in the imported cars list
+          if (data.activeTrip !== undefined) {
+            setActiveTrip(data.activeTrip ?? null);
+          } else if (data.cars?.length && activeTrip?.carId) {
+            const importedCarIds = new Set(data.cars.map(c => c.id));
+            if (!importedCarIds.has(activeTrip.carId)) setActiveTrip(null);
+          }
+          // Restore fill-ups only if the backup actually has trip/fillUp data
+          // (guard prevents wiping fill-ups when backup has neither)
+          if (data.trips?.length || data.fillUps?.length) {
+            const manualFillUps = (data.fillUps ?? []).filter(f => !f.id.startsWith("trip_"));
+            const autoFillUps = (data.trips ?? []).map(t => ({
+              id: `trip_${t.id}`,
+              date: (t.endedAt ?? t.startedAt ?? "").slice(0, 10),
+              liters: t.liters,
+              pricePerLiter: t.pricePerLiter,
+              carId: t.carId,
+            }));
+            setFillUps([...autoFillUps, ...manualFillUps]);
+          }
         }}
       />
     ),
