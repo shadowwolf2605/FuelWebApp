@@ -392,7 +392,11 @@ export default function FuelCalculator() {
     setRecurringExpenses(rs => rs.map(r => {
       if (r.id !== id) return r;
       const next = new Date(r.nextDueDate);
+      const origDay = next.getDate();
+      next.setDate(1); // prevent month overflow (e.g. Jan 31 + 1 month → Mar 3)
       next.setMonth(next.getMonth() + r.intervalMonths);
+      const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+      next.setDate(Math.min(origDay, lastDay));
       return { ...r, nextDueDate: next.toISOString().slice(0, 10) };
     }));
   }
@@ -548,7 +552,6 @@ export default function FuelCalculator() {
   const tabContent: Record<Tab, React.ReactNode> = {
     dashboard: (
       <Dashboard
-        dark={dark} setDark={setDark}
         activeTrip={activeTrip} setActiveTrip={setActiveTrip}
         tripHistory={carTripHistory} allTrips={tripHistory} addTrip={addTrip} deleteTrip={deleteTrip} updateTripPhoto={updateTripPhoto} updateTripDate={updateTripDate}
         currency={currency}

@@ -744,7 +744,7 @@ function ImportCard({ onImport, trips, expenses, maint }: {
     rows.push("=== РАЗХОДИ ===");
     rows.push("Дата,Категория,Сума,Бележка");
     for (const e of expenses) {
-      const cat: Record<string, string> = { repair:"Ремонт", wash:"Миене", parking:"Паркинг", toll:"Магистрала", fine:"Глоба", other:"Друго" };
+      const cat: Record<string, string> = { repair:"Ремонт", wash:"Миене", parking:"Паркинг", toll:"Магистрала", fine:"Глоба", other:"Друго", vignette:"Винетка", insurance:"Застраховка", inspection:"Техн. преглед" };
       rows.push([
         e.date,
         cat[e.category] ?? e.category,

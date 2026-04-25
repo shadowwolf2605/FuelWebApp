@@ -1706,8 +1706,6 @@ function FillUpsSection({ fillUps, onAdd, onDelete, currency }: {
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
 interface DashboardProps {
-  dark: boolean;
-  setDark: (v: boolean) => void;
   activeTrip: ActiveTrip | null;
   setActiveTrip: (t: ActiveTrip | null) => void;
   tripHistory: CompletedTrip[];
@@ -1734,7 +1732,7 @@ interface DashboardProps {
   deleteFillUp: (id: string) => void;
 }
 
-export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tripHistory, allTrips, allExpenses, allMaintItems, allDamages, allFillUps, addTrip, deleteTrip, updateTripPhoto, updateTripDate, currency, expenses, cars, activeCar, activeCarId, setActiveCarId, addCar, updateCar, deleteCar, fillUps, addFillUp, deleteFillUp }: DashboardProps) {
+export default function Dashboard({ activeTrip, setActiveTrip, tripHistory, allTrips, allExpenses, allMaintItems, allDamages, allFillUps, addTrip, deleteTrip, updateTripPhoto, updateTripDate, currency, expenses, cars, activeCar, activeCarId, setActiveCarId, addCar, updateCar, deleteCar, fillUps, addFillUp, deleteFillUp }: DashboardProps) {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [historySort, setHistorySort] = useState<"date" | "dist" | "cons">("date");
   const sortedHistory = [...tripHistory].sort((a, b) => {
