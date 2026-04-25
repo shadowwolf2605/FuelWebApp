@@ -481,11 +481,11 @@ export default function FuelCalculator() {
       let permission = Notification.permission;
       // Deduplicate: track which notifications were already shown today
       const shownKey = `fa_notif_shown_${new Date().toISOString().slice(0, 10)}_${effectiveCarId}`;
-      const alreadyShown = new Set<string>(JSON.parse(sessionStorage.getItem(shownKey) ?? "[]"));
+      const alreadyShown = new Set<string>(JSON.parse(localStorage.getItem(shownKey) ?? "[]"));
       function sendOnce(id: string, title: string, body: string) {
         if (alreadyShown.has(id)) return;
         alreadyShown.add(id);
-        sessionStorage.setItem(shownKey, JSON.stringify([...alreadyShown]));
+        localStorage.setItem(shownKey, JSON.stringify([...alreadyShown]));
         new Notification(title, { body, icon: "/icon.svg" });
       }
       if (permission === "default") {
