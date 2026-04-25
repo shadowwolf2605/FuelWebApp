@@ -139,11 +139,13 @@ function GasStationFinder() {
         const { latitude: lat, longitude: lon } = pos.coords;
         setUserPos({ lat, lon });
         try {
-          const query = `[out:json];node["amenity"="fuel"](around:5000,${lat},${lon});out 15;`;
+          const query = `[out:json];node["amenity"="fuel"](around:5000,${lat},${lon});out 20;`;
           const r = await fetch("https://overpass-api.de/api/interpreter", {
             method: "POST",
-            body: query,
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `data=${encodeURIComponent(query)}`,
           });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const data = await r.json();
           const list: GasStation[] = (data.elements ?? []).map((el: Record<string, unknown>) => ({
             id: el.id as number,
