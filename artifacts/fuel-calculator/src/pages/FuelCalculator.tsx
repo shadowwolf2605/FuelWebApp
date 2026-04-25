@@ -1,4 +1,4 @@
-import { Home, Wrench, Map as MapIcon, BarChart2, BarChart3, ArrowLeft, Palette, Bell, X, AlertTriangle, ChevronRight, Download, Share } from "lucide-react";
+import { Home, Wrench, Map as MapIcon, BarChart2, BarChart3, ArrowLeft, Palette, Bell, X, AlertTriangle, ChevronRight, Download, Share, Settings, Moon, DollarSign, FileText, RotateCcw, Info, Car } from "lucide-react";
 import { useState, useEffect, useRef, Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -214,6 +214,12 @@ export default function FuelCalculator() {
   const [activeCarId, setActiveCarId] = useLocalStorage<string>("fa_active_car", "");
   const [fillUps, setFillUps] = useLocalStorage<FuelFillUp[]>("fa_fillups", []);
   const [deletedItems, setDeletedItems] = useLocalStorage<DeletedItem[]>("fa_trash", []);
+
+  // ── Settings ─────────────────────────────────────────────────────────────────
+  const [showSettings, setShowSettings] = useState(false);
+  const [notifDocs, setNotifDocs] = useLocalStorage("fa_notif_docs", true);
+  const [notifFines, setNotifFines] = useLocalStorage("fa_notif_fines", true);
+  const [notifRecurring, setNotifRecurring] = useLocalStorage("fa_notif_rec", true);
 
   const activeCar = cars.find(c => c.id === activeCarId) ?? cars[0] ?? null;
   const effectiveCarId = activeCar?.id ?? "";
@@ -488,25 +494,27 @@ export default function FuelCalculator() {
       if (permission !== "granted") return;
 
       const today = Date.now();
-      const items = [
-        { label: "Винетка", date: carExpiries.vignette },
-        { label: "Гражданска застраховка", date: carExpiries.civil },
-        { label: "Каско", date: carExpiries.kasko },
-        { label: "Технически преглед", date: carExpiries.inspection },
-        { label: "Шофьорска книжка", date: carExpiries.driverLicense },
-      ];
-      for (const item of items) {
-        if (!item.date) continue;
-        const days = Math.floor((new Date(item.date).getTime() - today) / (1000 * 60 * 60 * 24));
-        if (days < 0) {
-          sendOnce(`doc_expired_${item.label}`, "🚨 Изтекъл документ", `${item.label} е изтекл(а) преди ${Math.abs(days)} дни!`);
-        } else if (days <= 30) {
-          sendOnce(`doc_expiring_${item.label}`, "⚠️ Изтичащ документ", `${item.label} изтича след ${days} дни (${item.date})`);
+      if (notifDocs) {
+        const items = [
+          { label: "Винетка", date: carExpiries.vignette },
+          { label: "Гражданска застраховка", date: carExpiries.civil },
+          { label: "Каско", date: carExpiries.kasko },
+          { label: "Технически преглед", date: carExpiries.inspection },
+          { label: "Шофьорска книжка", date: carExpiries.driverLicense },
+        ];
+        for (const item of items) {
+          if (!item.date) continue;
+          const days = Math.floor((new Date(item.date).getTime() - today) / (1000 * 60 * 60 * 24));
+          if (days < 0) {
+            sendOnce(`doc_expired_${item.label}`, "🚨 Изтекъл документ", `${item.label} е изтекл(а) преди ${Math.abs(days)} дни!`);
+          } else if (days <= 30) {
+            sendOnce(`doc_expiring_${item.label}`, "⚠️ Изтичащ документ", `${item.label} изтича след ${days} дни (${item.date})`);
+          }
         }
       }
 
       // Check unpaid fines with approaching deadlines (active car only)
-      for (const expense of carExpenses) {
+      if (notifFines) for (const expense of carExpenses) {
         if (expense.category === "fine" && !expense.finePaid && expense.fineDeadline) {
           const days = Math.floor((new Date(expense.fineDeadline).getTime() - today) / (1000 * 60 * 60 * 24));
           if (days >= 0 && days <= 3) {
@@ -516,7 +524,7 @@ export default function FuelCalculator() {
       }
 
       // Check recurring expenses (active car only)
-      for (const r of carRecurringExpenses) {
+      if (notifRecurring) for (const r of carRecurringExpenses) {
         const days = Math.floor((new Date(r.nextDueDate).getTime() - today) / (1000 * 60 * 60 * 24));
         if (days >= 0 && days <= 7) {
           sendOnce(`rec_${r.id}`, "📅 Предстоящ разход", `${r.label} — ${r.amount} ${currency} се дължи след ${days} дни`);
@@ -524,7 +532,7 @@ export default function FuelCalculator() {
       }
     }
     checkNotifications();
-  }, [carExpiries, carExpenses, carRecurringExpenses, effectiveCarId]);
+  }, [carExpiries, carExpenses, carRecurringExpenses, effectiveCarId, notifDocs, notifFines, notifRecurring]);
 
   useEffect(() => {
     if (carTripHistory.length === 0) return;
@@ -668,7 +676,7 @@ export default function FuelCalculator() {
       { key: "inspection", label: "Технически преглед", date: carExpiries.inspection },
       { key: "driverLicense", label: "Шофьорска книжка", date: carExpiries.driverLicense },
     ];
-    for (const d of docItems) {
+    if (notifDocs) for (const d of docItems) {
       if (!d.date) continue;
       const ms = new Date(d.date).getTime();
       if (isNaN(ms)) continue;
@@ -678,7 +686,7 @@ export default function FuelCalculator() {
     }
 
     // Unpaid fines with deadline soon
-    for (const e of carExpenses) {
+    if (notifFines) for (const e of carExpenses) {
       if (e.category === "fine" && !e.finePaid && e.fineDeadline) {
         const fineMs = new Date(e.fineDeadline).getTime();
         if (isNaN(fineMs)) continue;
@@ -689,7 +697,7 @@ export default function FuelCalculator() {
     }
 
     // Recurring expenses due soon
-    for (const r of carRecurringExpenses) {
+    if (notifRecurring) for (const r of carRecurringExpenses) {
       const recMs = new Date(r.nextDueDate).getTime();
       if (isNaN(recMs)) continue;
       const days = Math.floor((recMs - today) / 86400000);
@@ -717,7 +725,7 @@ export default function FuelCalculator() {
 
   return (
     <div className={dark ? "dark" : ""} style={{ height: "100dvh" }}>
-      <div className="h-full bg-[#f2f2f7] dark:bg-[#0d0d10] flex flex-col transition-colors duration-300">
+      <div className="h-full bg-[#f2f2f7] dark:bg-[#0d0d10] flex flex-col transition-colors duration-300 relative">
         {/* Nav bar */}
         <div className="px-4 pt-4 pb-3 flex-shrink-0 border-b border-black/5 dark:border-white/[0.06] bg-[#f2f2f7]/90 dark:bg-[#0d0d10]/90 backdrop-blur-md">
           <div className="flex items-center gap-2">
@@ -739,18 +747,11 @@ export default function FuelCalculator() {
             </h1>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                onClick={() => setTheme(t => THEME_ORDER[(THEME_ORDER.indexOf(t) + 1) % THEME_ORDER.length])}
-                className="w-8 h-8 rounded-xl flex items-center justify-center bg-gray-100 dark:bg-[#2c2c30] transition-all active:scale-95"
-                title={THEMES[theme].name}
+                onClick={() => setShowSettings(true)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center bg-gray-100 dark:bg-[#2c2c30] transition-all active:scale-95"
+                title="Настройки"
               >
-                <div className="w-4 h-4 rounded-full" style={{ background: THEMES[theme].primary }} />
-              </button>
-              <button
-                onClick={() => setCurrency((c) => c === "€" ? "$" : "€")}
-                className="px-3 py-1.5 rounded-xl text-[14px] font-bold transition-all active:scale-95 select-none"
-                style={{ background: THEMES[theme].primary + "1a", color: THEMES[theme].primary }}
-              >
-                {currency}
+                <Settings size={18} className="text-gray-600 dark:text-gray-300" />
               </button>
             </div>
           </div>
@@ -847,6 +848,171 @@ export default function FuelCalculator() {
               achievement={currentAchievement}
               onClose={() => setCurrentAchievement(null)}
             />
+          )}
+        </AnimatePresence>
+
+        {/* ── Settings Panel ─────────────────────────────────────────────── */}
+        <AnimatePresence>
+          {showSettings && (
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 320, damping: 32 }}
+              className="absolute inset-0 z-40 bg-[#f2f2f7] dark:bg-[#0d0d10] flex flex-col"
+            >
+              {/* Header */}
+              <div className="px-4 pt-4 pb-3 flex-shrink-0 border-b border-black/5 dark:border-white/[0.06] bg-[#f2f2f7]/90 dark:bg-[#0d0d10]/90 backdrop-blur-md flex items-center gap-3">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-[#2c2c30] text-gray-700 dark:text-gray-300 flex-shrink-0 active:scale-95 transition-transform"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <h1 className="flex-1 text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">Настройки</h1>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto overscroll-none">
+                <div className="px-4 py-5 space-y-5 pb-10">
+
+                  {/* ── Вид ── */}
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-2">Вид</p>
+                    <div className="bg-white dark:bg-[#1c1c1e] rounded-2xl overflow-hidden divide-y divide-gray-100 dark:divide-white/[0.06]">
+
+                      {/* Dark mode */}
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center flex-shrink-0">
+                          <Moon size={15} className="text-white" />
+                        </div>
+                        <span className="flex-1 text-[15px] text-gray-900 dark:text-white">Тъмен режим</span>
+                        <button
+                          onClick={() => setDark(!dark)}
+                          className="w-12 h-7 rounded-full transition-colors relative flex-shrink-0"
+                          style={{ background: dark ? THEMES[theme].primary : "#d1d5db" }}
+                        >
+                          <motion.div
+                            animate={{ x: dark ? 21 : 2 }}
+                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                            className="absolute top-1 w-5 h-5 bg-white rounded-full shadow-sm"
+                          />
+                        </button>
+                      </div>
+
+                      {/* Theme */}
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: THEMES[theme].primary }}>
+                          <Palette size={15} className="text-white" />
+                        </div>
+                        <span className="flex-1 text-[15px] text-gray-900 dark:text-white">Цветова тема</span>
+                        <div className="flex items-center gap-2.5">
+                          {THEME_ORDER.map((t) => (
+                            <button
+                              key={t}
+                              onClick={() => setTheme(t)}
+                              className="w-7 h-7 rounded-full transition-all active:scale-90"
+                              style={{
+                                background: THEMES[t].primary,
+                                boxShadow: theme === t
+                                  ? `0 0 0 2px white, 0 0 0 3.5px ${THEMES[t].primary}`
+                                  : "none",
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Общи ── */}
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-2">Общи</p>
+                    <div className="bg-white dark:bg-[#1c1c1e] rounded-2xl overflow-hidden divide-y divide-gray-100 dark:divide-white/[0.06]">
+
+                      {/* Currency */}
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <div className="w-8 h-8 rounded-xl bg-green-500 flex items-center justify-center flex-shrink-0">
+                          <DollarSign size={15} className="text-white" />
+                        </div>
+                        <span className="flex-1 text-[15px] text-gray-900 dark:text-white">Валута</span>
+                        <div className="flex bg-gray-100 dark:bg-[#2c2c30] rounded-xl p-1 gap-0.5">
+                          {["€", "$", "лв"].map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => setCurrency(c)}
+                              className={`px-3 py-1.5 rounded-[9px] text-[13px] font-semibold transition-all ${currency === c ? "bg-white dark:bg-[#3a3a40] text-gray-900 dark:text-white shadow-sm" : "text-gray-400 dark:text-gray-500"}`}
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Известия ── */}
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-2">Известия</p>
+                    <div className="bg-white dark:bg-[#1c1c1e] rounded-2xl overflow-hidden divide-y divide-gray-100 dark:divide-white/[0.06]">
+                      {([
+                        { key: "docs",      label: "Изтичащи документи",  icon: FileText,       color: "bg-blue-500",   val: notifDocs,      set: setNotifDocs },
+                        { key: "fines",     label: "Напомняния за глоби",  icon: AlertTriangle,  color: "bg-red-500",    val: notifFines,     set: setNotifFines },
+                        { key: "recurring", label: "Повтарящи разходи",    icon: RotateCcw,      color: "bg-purple-500", val: notifRecurring, set: setNotifRecurring },
+                      ] as const).map(({ key, label, icon: Icon, color, val, set }) => (
+                        <div key={key} className="flex items-center gap-3 px-4 py-3.5">
+                          <div className={`w-8 h-8 rounded-xl ${color} flex items-center justify-center flex-shrink-0`}>
+                            <Icon size={15} className="text-white" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 dark:text-white">{label}</span>
+                          <button
+                            onClick={() => set(!val)}
+                            className="w-12 h-7 rounded-full transition-colors relative flex-shrink-0"
+                            style={{ background: val ? THEMES[theme].primary : "#d1d5db" }}
+                          >
+                            <motion.div
+                              animate={{ x: val ? 21 : 2 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                              className="absolute top-1 w-5 h-5 bg-white rounded-full shadow-sm"
+                            />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── За приложението ── */}
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-2">За приложението</p>
+                    <div className="bg-white dark:bg-[#1c1c1e] rounded-2xl overflow-hidden divide-y divide-gray-100 dark:divide-white/[0.06]">
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <div className="w-8 h-8 rounded-xl bg-gray-400 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+                          <Info size={15} className="text-white" />
+                        </div>
+                        <span className="flex-1 text-[15px] text-gray-900 dark:text-white">Версия</span>
+                        <span className="text-[14px] text-gray-400 dark:text-gray-500">v1.0.0</span>
+                      </div>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <div className="w-8 h-8 rounded-xl bg-gray-400 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+                          <Car size={15} className="text-white" />
+                        </div>
+                        <span className="flex-1 text-[15px] text-gray-900 dark:text-white">Коли в гаража</span>
+                        <span className="text-[14px] text-gray-400 dark:text-gray-500 tabular-nums">{cars.length}</span>
+                      </div>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <div className="w-8 h-8 rounded-xl bg-gray-400 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+                          <BarChart2 size={15} className="text-white" />
+                        </div>
+                        <span className="flex-1 text-[15px] text-gray-900 dark:text-white">Общо пътувания</span>
+                        <span className="text-[14px] text-gray-400 dark:text-gray-500 tabular-nums">{tripHistory.length}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
