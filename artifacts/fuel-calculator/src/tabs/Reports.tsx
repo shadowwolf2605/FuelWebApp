@@ -33,6 +33,7 @@ function monthOf(iso: string) { return new Date(iso).getMonth(); }
 const EXPENSE_BG: Record<string, string> = {
   repair: "Ремонт", wash: "Миене", parking: "Паркинг",
   toll: "Магистрала", fine: "Глоба", other: "Друго",
+  vignette: "Винетка", insurance: "Застраховка", inspection: "Техн. преглед",
 };
 
 const PIE_COLORS = ["#3b82f6", "#f97316", "#22c55e", "#a855f7", "#ef4444", "#eab308", "#06b6d4"];

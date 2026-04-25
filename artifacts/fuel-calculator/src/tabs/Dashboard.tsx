@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Fuel, Droplets, Banknote, CreditCard, Gauge, Calendar, Inbox, Sun, Moon,
+  Fuel, Droplets, Banknote, CreditCard, Gauge, Calendar, Inbox,
   MapPin, Flag, ArrowRight, AlertTriangle, Navigation, Play, Square, Trash2,
   CheckCircle2, MessageSquare, Timer, ChevronRight, X, Route, Users, Loader2,
   Search, Split, Pencil, BarChart2, Clock, Camera, Car, Trophy, Plus, Share2, Copy,
@@ -825,6 +825,7 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
   const consColor = cons < 6 ? "text-green-600 bg-green-500/12" : cons < 9 ? "text-orange-500 bg-orange-500/12" : "text-red-500 bg-red-500/12";
   const [shared, setShared] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [showPhoto, setShowPhoto] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [editingDate, setEditingDate] = useState(false);
   const [dateValue, setDateValue] = useState("");
@@ -972,7 +973,7 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
               </button>
             )}
             {trip.photo && (
-              <button onClick={() => setShowMap(v => !v)}
+              <button onClick={() => setShowPhoto(v => !v)}
                 className="text-[12px] font-semibold text-green-600 bg-green-500/10 px-3 py-1 rounded-full">
                 Снимка
               </button>
@@ -1018,10 +1019,7 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
             />
           );
         })()}
-        {showMap && trip.photo && !trip.routePoints?.length && (
-          <img src={trip.photo} className="w-full rounded-xl mt-2 object-cover border border-gray-200 dark:border-white/10" style={{ maxHeight: 180 }} />
-        )}
-        {trip.photo && trip.routePoints && trip.routePoints.length > 3 && showMap && (
+        {showPhoto && trip.photo && (
           <img src={trip.photo} className="w-full rounded-xl mt-2 object-cover border border-gray-200 dark:border-white/10" style={{ maxHeight: 180 }} />
         )}
       </Card>
@@ -1771,13 +1769,6 @@ export default function Dashboard({ dark, setDark, activeTrip, setActiveTrip, tr
 
   return (
     <div className="space-y-4 px-4 pb-8 pt-2">
-      {/* Dark mode toggle */}
-      <div className="flex justify-end">
-        <button onClick={() => setDark(!dark)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white dark:bg-[#1e1e22] border border-black/5 dark:border-white/[0.07] card-shadow transition-colors active:scale-95">
-          {dark ? <Moon size={17} className="text-indigo-400" /> : <Sun size={17} className="text-orange-400" />}
-        </button>
-      </div>
-
       <CarsSection cars={cars} activeCar={activeCar} activeCarId={activeCarId} setActiveCarId={setActiveCarId} addCar={addCar} updateCar={updateCar} deleteCar={deleteCar} tripHistory={allTrips} allExpenses={allExpenses} allMaintItems={allMaintItems} allDamages={allDamages} allFillUps={allFillUps} />
       <StatsBar trips={tripHistory} expenses={expenses} currency={currency} />
 

@@ -1,5 +1,5 @@
 import { Home, Wrench, Map as MapIcon, BarChart2, BarChart3, ArrowLeft, Palette, Bell, X, AlertTriangle, ChevronRight, Download, Share, Settings, Moon, DollarSign, FileText, RotateCcw, Info, Car } from "lucide-react";
-import { useState, useEffect, useRef, Component } from "react";
+import { useState, useEffect, Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -154,8 +154,6 @@ export default function FuelCalculator() {
   const [expiries, setExpiries] = useLocalStorage<ExpiryDates>("fa_expiries", {
     vignette: "", civil: "", kasko: "", inspection: "", driverLicense: "",
   });
-  const notifCheckedRef = useRef(false);
-
   // PWA Install banner
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useLocalStorage("fa_install_dismissed", true);
