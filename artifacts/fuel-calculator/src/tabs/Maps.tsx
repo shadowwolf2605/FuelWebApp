@@ -125,6 +125,33 @@ interface GasStation {
   distM: number;
 }
 
+// ─── Overpass helpers ─────────────────────────────────────────────────────────
+
+const OVERPASS_SERVERS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.openstreetmap.fr/api/interpreter",
+];
+
+async function queryOverpass(query: string): Promise<Record<string, unknown>> {
+  let lastErr: unknown;
+  for (const server of OVERPASS_SERVERS) {
+    try {
+      const r = await fetch(server, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!r.ok) { lastErr = new Error(`HTTP ${r.status} от ${server}`); continue; }
+      return await r.json() as Record<string, unknown>;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+
+// ─── Gas Station Finder ───────────────────────────────────────────────────────
+
 function GasStationFinder() {
   const [stations, setStations] = useState<GasStation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,15 +166,9 @@ function GasStationFinder() {
         const { latitude: lat, longitude: lon } = pos.coords;
         setUserPos({ lat, lon });
         try {
-          const query = `[out:json];node["amenity"="fuel"](around:5000,${lat},${lon});out 20;`;
-          const r = await fetch("https://overpass-api.de/api/interpreter", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `data=${encodeURIComponent(query)}`,
-          });
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const data = await r.json();
-          const list: GasStation[] = (data.elements ?? []).map((el: Record<string, unknown>) => ({
+          const query = `[out:json][timeout:15];node["amenity"="fuel"](around:5000,${lat},${lon});out 20;`;
+          const data = await queryOverpass(query);
+          const list: GasStation[] = ((data.elements ?? []) as Record<string, unknown>[]).map((el) => ({
             id: el.id as number,
             name: ((el.tags as Record<string, string>)?.name) || ((el.tags as Record<string, string>)?.brand) || "Бензиностанция",
             brand: (el.tags as Record<string, string>)?.brand,
@@ -157,7 +178,9 @@ function GasStationFinder() {
           })).sort((a: GasStation, b: GasStation) => a.distM - b.distM);
           setStations(list);
           if (list.length === 0) setError("Не са намерени бензиностанции в радиус 5 км");
-        } catch { setError("Грешка при търсенето. Провери интернет връзката."); }
+        } catch (e) {
+          setError(`Грешка: ${e instanceof Error ? e.message : "Провери интернет връзката."}`);
+        }
         setLoading(false);
       },
       (e) => { setError(e.message); setLoading(false); },
