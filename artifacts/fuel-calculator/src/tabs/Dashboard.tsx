@@ -1805,7 +1805,7 @@ export default function Dashboard({ activeTrip, setActiveTrip, tripHistory, allT
 
       <BestTripCard trips={tripHistory} currency={currency} />
 
-      <CarComparison cars={cars} tripHistory={tripHistory} currency={currency} />
+      <CarComparison cars={cars} tripHistory={allTrips} currency={currency} />
 
       {/* History */}
       <div>

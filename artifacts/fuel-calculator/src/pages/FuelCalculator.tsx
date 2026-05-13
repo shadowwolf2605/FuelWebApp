@@ -48,6 +48,9 @@ const THEMES: Record<AppTheme, { primary: string; light: string; name: string }>
 };
 const THEME_ORDER: AppTheme[] = ["blue", "purple", "green", "orange", "rose"];
 
+// ─── Stable empty expiries object (must be module-level to avoid recreating on every render) ──
+const EMPTY_EXPIRIES: ExpiryDates = { vignette: "", civil: "", kasko: "", inspection: "", driverLicense: "" };
+
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
 interface Achievement {
@@ -175,7 +178,7 @@ export default function FuelCalculator() {
   }
 
   function navigateTo(tab: Tab) {
-    setTabHistory((h) => [...h, activeTab]);
+    if (tab !== activeTab) setTabHistory((h) => [...h, activeTab]);
     setActiveTab(tab);
   }
 
@@ -259,7 +262,6 @@ export default function FuelCalculator() {
   // ── Per-car expiry dates ─────────────────────────────────────────────────────
   // If a car is active use its own expiries (default empty). Only use global fa_expiries
   // when there is no active car at all (legacy / no-car mode).
-  const EMPTY_EXPIRIES: ExpiryDates = { vignette: "", civil: "", kasko: "", inspection: "", driverLicense: "" };
   const carExpiries: ExpiryDates = activeCar ? (activeCar.expiries ?? EMPTY_EXPIRIES) : (expiries ?? EMPTY_EXPIRIES);
   function setCarExpiries(e: ExpiryDates) {
     if (activeCar) {
