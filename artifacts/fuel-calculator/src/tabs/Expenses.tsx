@@ -249,11 +249,12 @@ function ExpensesAnalysis({ expenses, currency }: { expenses: Expense[]; currenc
 
 // ─── Sell or Keep Calculator ──────────────────────────────────────────────────
 
-function SellKeepCalc({ expenses, avgConsumption, currency }: { expenses: Expense[]; avgConsumption: number | null; currency: string }) {
+function SellKeepCalc({ expenses: _expenses, avgConsumption, currency }: { expenses: Expense[]; avgConsumption: number | null; currency: string }) {
   const [profile, setProfile] = useState<CarProfile>({
     make: "", model: "", year: "", currentValue: "",
     annualKm: "", insuranceCost: "", maintenanceBudget: "",
   });
+  const [fuelPriceText, setFuelPriceText] = useState("");
 
   function set(k: keyof CarProfile, v: string) { setProfile((p) => ({ ...p, [k]: v })); }
 
@@ -261,13 +262,10 @@ function SellKeepCalc({ expenses, avgConsumption, currency }: { expenses: Expens
   const annualKm = parseNum(profile.annualKm);
   const insuranceCost = parseNum(profile.insuranceCost);
   const maintenanceBudget = parseNum(profile.maintenanceBudget);
-  const avgFuelPrice = 1.79; // fallback €/L
+  const fuelPrice = parseNum(fuelPriceText) ?? 1.79; // user-entered or fallback
 
   const annualFuelCost = avgConsumption && annualKm && isFinite(avgConsumption) && isFinite(annualKm)
-    ? (annualKm * avgConsumption / 100) * avgFuelPrice : null;
-
-  const annualExpenses = expenses.length > 0
-    ? expenses.reduce((s, e) => s + e.amount, 0) : null;
+    ? (annualKm * avgConsumption / 100) * fuelPrice : null;
 
   const totalAnnual = (annualFuelCost ?? 0) + (insuranceCost ?? 0) + (maintenanceBudget ?? 0) * 12;
 
@@ -324,6 +322,10 @@ function SellKeepCalc({ expenses, avgConsumption, currency }: { expenses: Expens
         <Field label="Годишен пробег" placeholder="напр. 20 000" unit="км"
           icon={<TrendingUp size={17} />} iconColorClass="text-blue-500"
           value={profile.annualKm} onChange={(v) => set("annualKm", v)} />
+        <Divider />
+        <Field label="Цена на горивото" placeholder="напр. 1.79" unit={`${currency}/л`}
+          icon={<Droplets size={17} />} iconColorClass="text-cyan-500"
+          value={fuelPriceText} onChange={setFuelPriceText} />
         <Divider />
         <Field label="Застраховка (годишно)" placeholder="напр. 450" unit={currency}
           icon={<Tag size={17} />} iconColorClass="text-orange-500"
