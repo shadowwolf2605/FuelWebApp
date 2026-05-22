@@ -41,7 +41,9 @@ export function daysUntil(dateStr: string): number {
 }
 
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  // Use local date components so midnight in UTC+2/UTC+3 still shows today, not yesterday
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** Compress an image file to max 900px wide/tall at 70% JPEG quality before storing in localStorage */

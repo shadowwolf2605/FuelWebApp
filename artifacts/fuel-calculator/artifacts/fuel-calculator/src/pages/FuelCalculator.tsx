@@ -400,7 +400,9 @@ export default function FuelCalculator() {
       next.setMonth(next.getMonth() + r.intervalMonths);
       const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
       next.setDate(Math.min(origDay, lastDay));
-      return { ...r, nextDueDate: next.toISOString().slice(0, 10) };
+      // Use local date components to avoid UTC midnight shifting the date one day back
+      const yy = next.getFullYear(), mm = String(next.getMonth() + 1).padStart(2, "0"), dd = String(next.getDate()).padStart(2, "0");
+      return { ...r, nextDueDate: `${yy}-${mm}-${dd}` };
     }));
   }
 

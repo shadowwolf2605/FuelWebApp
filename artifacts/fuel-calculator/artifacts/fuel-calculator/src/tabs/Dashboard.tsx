@@ -833,7 +833,10 @@ function HistoryRow({ trip, onDelete, onUpdatePhoto, onDeletePhoto, onUpdateDate
 
   function openDateEditor() {
     const d = new Date(trip.endedAt);
-    setDateValue(d.toISOString().slice(0, 10));
+    // Use local date components (not UTC) so Bulgarian users (UTC+2/+3) see the
+    // correct calendar date instead of a UTC date that may differ by one day.
+    const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setDateValue(localDate);
     setTimeValue(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
     setEditingDate(true);
   }
